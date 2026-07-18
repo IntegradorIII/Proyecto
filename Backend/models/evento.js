@@ -22,9 +22,17 @@ const Evento = sequelize.define('Evento', {
     type: DataTypes.TIME,
     allowNull: false,
   },
+  horaFin: {
+    type: DataTypes.TIME,
+    allowNull: false,
+  },
   lugar: {
     type: DataTypes.STRING,
     allowNull: false,
+  },
+  cerrado: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
   },
 }, {
   tableName: 'eventos',

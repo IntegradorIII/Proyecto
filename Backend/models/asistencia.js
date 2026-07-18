@@ -8,13 +8,25 @@ const Asistencia = sequelize.define('Asistencia', {
     autoIncrement: true,
   },
   estado: {
-    type: DataTypes.ENUM('Presente', 'Ausente', 'Tardanza', 'Justificado'),
+    type: DataTypes.ENUM('Presente', 'Ausente', 'Tardanza', 'Justificado', 'Invitado'),
     allowNull: false,
     defaultValue: 'Presente',
   },
   horaRegistro: {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW,
+  },
+  esInvitado: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+  },
+  invitadoNombre: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  invitadoCedula: {
+    type: DataTypes.STRING,
+    allowNull: true,
   },
 }, {
   tableName: 'asistencias',

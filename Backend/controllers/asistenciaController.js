@@ -3,25 +3,48 @@ const { Asistencia, Participante, Evento, Usuario } = require('../models');
 // Función para registrar asistencia (Check-In)
 const registrarAsistencia = async (req, res) => {
   try {
-    const { eventoId, usuarioId } = req.body;
+    const { eventoId, usuarioId, esInvitado, invitadoNombre, invitadoCedula } = req.body;
 
-    // Validación básica
-    if (!eventoId || !usuarioId) {
-      return res.status(400).json({ mensaje: 'Faltan datos obligatorios: eventoId y usuarioId.' });
+    if (!eventoId) {
+      return res.status(400).json({ mensaje: 'Faltan datos obligatorios: eventoId.' });
     }
 
-    // Comprobar si el evento y el usuario existen
     const evento = await Evento.findByPk(eventoId);
     if (!evento) {
       return res.status(404).json({ mensaje: 'Evento no encontrado.' });
     }
+
+    // RN-08: Bifurcación del Flujo Invitado vs Miembro
+    if (esInvitado) {
+      if (!invitadoNombre || !invitadoCedula) {
+        return res.status(400).json({ mensaje: 'Para invitados, nombre completo y cédula son obligatorios.' });
+      }
+
+      const nuevaAsistencia = await Asistencia.create({
+        eventoId,
+        estado: 'Invitado',
+        esInvitado: true,
+        invitadoNombre,
+        invitadoCedula
+      });
+
+      return res.status(201).json({
+        mensaje: 'Asistencia de invitado registrada correctamente.',
+        asistencia: nuevaAsistencia
+      });
+    }
+
+    // Flujo Miembro
+    if (!usuarioId) {
+      return res.status(400).json({ mensaje: 'Faltan datos obligatorios: usuarioId.' });
+    }
+
     const usuario = await Usuario.findByPk(usuarioId);
     if (!usuario) {
       return res.status(404).json({ mensaje: 'Usuario no encontrado.' });
     }
 
     // RN-04: Delimitación de Convocatoria Obligatoria
-    // Verificar si el usuario fue convocado como participante del evento
     const esParticipante = await Participante.findOne({
       where: {
         eventoId,
@@ -36,7 +59,6 @@ const registrarAsistencia = async (req, res) => {
     }
 
     // RN-05: Unicidad del Registro de Asistencia
-    // Verificar si ya existe un registro previo de asistencia
     const asistenciaPrevia = await Asistencia.findOne({
       where: {
         eventoId,
@@ -50,15 +72,34 @@ const registrarAsistencia = async (req, res) => {
       });
     }
 
-    // Si pasa todas las validaciones, procedemos a registrar la asistencia
+    // RN-06: Gestión de Tolerancia Luminal (Cálculo de Tardanza)
+    // Combinar evento.fecha y evento.horaInicio
+    const fechaHoraEventoStr = `${evento.fecha}T${evento.horaInicio}`;
+    const inicioEvento = new Date(fechaHoraEventoStr);
+    const ahora = new Date();
+
+    let estadoCalculado = 'Presente';
+    // Validar si la fecha del evento es válida
+    if (!isNaN(inicioEvento.getTime())) {
+      const diffMs = ahora - inicioEvento;
+      const diffMinutos = Math.floor(diffMs / (1000 * 60));
+      
+      // Tolerancia de 20 minutos
+      if (diffMinutos > 20) {
+        estadoCalculado = 'Tardanza';
+      }
+    }
+
+    // Procedemos a registrar la asistencia
     const nuevaAsistencia = await Asistencia.create({
       eventoId,
       usuarioId,
-      estado: 'Presente' // Por defecto Presente al momento de escanear/hacer check-in
+      estado: estadoCalculado
     });
 
     return res.status(201).json({
       mensaje: 'Asistencia registrada correctamente.',
+      estadoAsignado: estadoCalculado,
       asistencia: nuevaAsistencia
     });
 

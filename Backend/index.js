@@ -19,11 +19,17 @@ app.use('/api/auth', authRoutes);
 app.use('/api/eventos', eventRoutes);
 app.use('/api/asistencias', asistenciaRoutes);
 
+const { iniciarCronCierreEventos } = require('./controllers/cronController');
+
 const PORT = process.env.PORT || 3000;
 
 const iniciar = async () => {
   await conectar();
   await sequelize.sync();
+  
+  // Iniciar tareas automatizadas
+  iniciarCronCierreEventos();
+
   app.listen(PORT, () => {
     console.log(`Servidor corriendo en http://localhost:${PORT}`);
   });
