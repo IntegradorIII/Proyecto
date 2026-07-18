@@ -3,7 +3,9 @@ const express = require('express');
 const cors = require('cors');
 const { sequelize, conectar } = require('./config/db');
 const Usuario = require('./models/Usuario');
+const Evento = require('./models/Evento');
 const authRoutes = require('./routes/authRoutes');
+const eventoRoutes = require('./routes/eventoRoutes');
 
 const app = express();
 app.use(cors());
@@ -14,6 +16,7 @@ app.get('/', (req, res) => {
 });
 
 app.use('/api/auth', authRoutes);
+app.use('/api/eventos', eventoRoutes);
 
 const PORT = process.env.PORT || 3000;
 
