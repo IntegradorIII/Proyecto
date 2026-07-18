@@ -28,6 +28,15 @@ const Asistencia = sequelize.define('Asistencia', {
     type: DataTypes.STRING,
     allowNull: true,
   },
+  tipo_registro: {
+    type: DataTypes.ENUM('QR', 'Manual'),
+    allowNull: false,
+    defaultValue: 'QR',
+  },
+  registrado_por: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
 }, {
   tableName: 'asistencias',
   timestamps: true,

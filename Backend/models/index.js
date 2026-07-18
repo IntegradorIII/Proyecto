@@ -14,6 +14,9 @@ Asistencia.belongsTo(Usuario, { foreignKey: 'usuarioId' });
 Evento.hasMany(Asistencia, { foreignKey: 'eventoId' });
 Asistencia.belongsTo(Evento, { foreignKey: 'eventoId' });
 
+// Relación de Operador que registra asistencia manual
+Asistencia.belongsTo(Usuario, { as: 'operadorRegistro', foreignKey: 'registrado_por' });
+
 // Relación de Participante (Convocatoria)
 Usuario.hasMany(Participante, { foreignKey: 'usuarioId' });
 Participante.belongsTo(Usuario, { foreignKey: 'usuarioId' });
