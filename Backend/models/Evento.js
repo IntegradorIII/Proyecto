@@ -7,29 +7,17 @@ const Evento = sequelize.define('Evento', {
     primaryKey: true,
     autoIncrement: true,
   },
-  nombre: {
-    type: DataTypes.STRING,
-    allowNull: false,
+  nombre: {type: DataTypes.STRING, allowNull: false,
   },
-  fecha: {
-    type: DataTypes.DATEONLY,
-    allowNull: false,
+  fecha: {type: DataTypes.DATEONLY, allowNull: false,
   },
-  hora: {
-    type: DataTypes.TIME,
-    allowNull: false,
+  hora: { type: DataTypes.TIME, allowNull: false,
   },
-  lugar: {
-    type: DataTypes.STRING,
-    allowNull: false,
+  lugar: { type: DataTypes.STRING, allowNull: false,
   },
-  toleranciaMin: {
-    type: DataTypes.INTEGER,
-    defaultValue: 20,
+  toleranciaMin: { type: DataTypes.INTEGER, defaultValue: 20,
   },
-}, {
-  tableName: 'eventos',
-  timestamps: true,
+}, { tableName: 'eventos', timestamps: true,
 });
 
 module.exports = Evento;
