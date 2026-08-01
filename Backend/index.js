@@ -10,6 +10,7 @@ const authRoutes = require('./routes/authRoutes');
 const eventoRoutes = require('./routes/eventoRoutes');
 const participanteRoutes = require('./routes/participanteRoutes');
 const asistenciaRoutes = require('./routes/asistenciaRoutes');
+const usuarioRoutes = require('./routes/usuarioRoutes');
 
 const app = express();
 app.use(cors());
@@ -23,6 +24,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/eventos', eventoRoutes);
 app.use('/api/participantes', participanteRoutes);
 app.use('/api/asistencia', asistenciaRoutes);
+app.use('/api/usuarios', usuarioRoutes);
 
 const PORT = process.env.PORT || 3000;
 
