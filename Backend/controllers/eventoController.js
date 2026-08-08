@@ -1,13 +1,19 @@
 const Evento = require('../models/Evento');
 const Asistencia = require('../models/Asistencia');
 const Participante = require('../models/Participante');
+const QRCode = require('qrcode');
 
 const crearEvento = async (req, res) => {
   try {
-    const { nombre, fecha, hora, lugar, toleranciaMin } = req.body;
+    const { nombre, fecha, hora, lugar, toleranciaMin, tipoReunion } = req.body;
 
     if (!nombre || !fecha || !hora || !lugar) {
       return res.status(400).json({ mensaje: 'Todos los campos son obligatorios' });
+    }
+
+    const duplicado = await Evento.findOne({ where: { nombre, fecha, hora } });
+    if (duplicado) {
+      return res.status(400).json({ mensaje: 'Ya existe una reunión con el mismo nombre, fecha y hora' });
     }
 
     const nuevoEvento = await Evento.create({
@@ -16,7 +22,12 @@ const crearEvento = async (req, res) => {
       hora,
       lugar,
       toleranciaMin: toleranciaMin || 20,
+      tipoReunion: tipoReunion || 'solo_miembros',
     });
+
+    const contenidoQR = `${process.env.APP_URL}/reunion/${nuevoEvento.id}`;
+    const codigoQr = await QRCode.toDataURL(contenidoQR);
+    await nuevoEvento.update({ codigoQr });
 
     res.status(201).json({
       mensaje: 'Evento creado correctamente',

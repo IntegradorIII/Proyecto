@@ -5,40 +5,106 @@ const Usuario = require('../models/Usuario');
 
 const checkInQR = async (req, res) => {
   try {
-    const { participanteId, eventoId } = req.body;
+    const { usuarioId, eventoId } = req.body;
 
-    const participante = await Participante.findOne({
-      where: { id: participanteId, eventoId },
-    });
-    if (!participante) {
-      return res.status(404).json({ mensaje: 'Participante no encontrado en este evento' });
+    const evento = await Evento.findByPk(eventoId);
+    if (!evento) {
+      return res.status(404).json({ mensaje: 'Evento no encontrado' });
     }
 
-    const yaRegistrado = await Asistencia.findOne({ where: { participanteId } });
+    const usuario = await Usuario.findByPk(usuarioId);
+    if (!usuario) {
+      return res.status(404).json({ mensaje: 'Usuario no encontrado' });
+    }
+
+    let participante = await Participante.findOne({ where: { usuarioId, eventoId } });
+
+    if (evento.tipoReunion === 'solo_miembros' && !participante) {
+      return res.status(403).json({ mensaje: 'No está convocado a esta reunión' });
+    }
+
+    if (!participante) {
+      participante = await Participante.create({ usuarioId, eventoId });
+    }
+
+    const yaRegistrado = await Asistencia.findOne({ where: { participanteId: participante.id } });
     if (yaRegistrado) {
       return res.status(409).json({ mensaje: 'El participante ya tiene asistencia registrada' });
     }
 
-    const evento = await Evento.findByPk(eventoId);
     const ahora = new Date();
     const horaEvento = new Date(ahora.toDateString() + ' ' + evento.hora);
     const diffMinutos = (ahora - horaEvento) / (1000 * 60);
     const estado = diffMinutos <= evento.toleranciaMin ? 'presente' : 'tardio';
 
     const asistencia = await Asistencia.create({
-      participanteId,
+      participanteId: participante.id,
       horaIngreso: ahora,
       metodo: 'qr',
       estado,
     });
 
-    res.json({
-      mensaje: `Asistencia registrada como ${estado}`,
-      asistencia,
-    });
+    res.json({ mensaje: `Asistencia registrada como ${estado}`, asistencia });
   } catch (error) {
     console.error('Error en checkInQR:', error);
     res.status(500).json({ mensaje: 'Error al registrar asistencia', error: error.message });
+  }
+};
+
+const checkInInvitado = async (req, res) => {
+  try {
+    const { eventoId, nombre, cedula } = req.body;
+
+    if (!eventoId || !nombre || !cedula) {
+      return res.status(400).json({ mensaje: 'eventoId, nombre y cedula son obligatorios' });
+    }
+
+    const evento = await Evento.findByPk(eventoId);
+    if (!evento) {
+      return res.status(404).json({ mensaje: 'Evento no encontrado' });
+    }
+
+    if (evento.tipoReunion === 'solo_miembros') {
+      return res.status(403).json({ mensaje: 'Esta reunión no permite invitados' });
+    }
+
+    let usuario = await Usuario.findOne({ where: { cedula } });
+    if (!usuario) {
+      usuario = await Usuario.create({
+        nombre,
+        cedula,
+        correo: `invitado_${cedula}@temp.com`,
+        passwordHash: '-',
+        rol: 'Invitado',
+      });
+    }
+
+    let participante = await Participante.findOne({ where: { usuarioId: usuario.id, eventoId } });
+    if (!participante) {
+      participante = await Participante.create({ usuarioId: usuario.id, eventoId });
+    }
+
+    const yaRegistrado = await Asistencia.findOne({ where: { participanteId: participante.id } });
+    if (yaRegistrado) {
+      return res.status(409).json({ mensaje: 'Ya tiene asistencia registrada' });
+    }
+
+    const ahora = new Date();
+    const horaEvento = new Date(ahora.toDateString() + ' ' + evento.hora);
+    const diffMinutos = (ahora - horaEvento) / (1000 * 60);
+    const estado = diffMinutos <= evento.toleranciaMin ? 'presente' : 'tardio';
+
+    const asistencia = await Asistencia.create({
+      participanteId: participante.id,
+      horaIngreso: ahora,
+      metodo: 'qr',
+      estado,
+    });
+
+    res.json({ mensaje: `Invitado registrado como ${estado}`, asistencia });
+  } catch (error) {
+    console.error('Error en checkInInvitado:', error);
+    res.status(500).json({ mensaje: 'Error al registrar invitado', error: error.message });
   }
 };
 
@@ -123,4 +189,4 @@ const reporte = async (req, res) => {
   }
 };
 
-module.exports = { checkInQR, checkInManual, reporte };
+module.exports = { checkInQR, checkInInvitado, checkInManual, reporte };

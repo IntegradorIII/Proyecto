@@ -1,6 +1,7 @@
 const Participante = require('../models/Participante');
 const Usuario = require('../models/Usuario');
 const Evento = require('../models/Evento');
+const QRCode = require('qrcode');
 
 const registrarParticipante = async (req, res) => {
   try {
@@ -97,4 +98,4 @@ const listarParticipantes = async (req, res) => {
   }
 };
 
-module.exports = { registrarParticipante, asociarParticipante, listarParticipantes };
+module.exports = { asociarParticipante, listarParticipantes };

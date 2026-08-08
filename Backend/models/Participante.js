@@ -19,10 +19,6 @@ const Participante = sequelize.define('Participante', {
     allowNull: false,
     references: { model: Evento, key: 'id' },
   },
-  codigoQr: {
-    type: DataTypes.STRING,
-    allowNull: true,
-  },
 }, {
   tableName: 'participantes',
   timestamps: true,
