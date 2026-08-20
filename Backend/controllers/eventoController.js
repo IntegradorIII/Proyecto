@@ -11,6 +11,17 @@ const crearEvento = async (req, res) => {
       return res.status(400).json({ mensaje: 'Todos los campos son obligatorios' });
     }
 
+    // Validar que la reunión no sea en el pasado ni con menos de 30 min de anticipación
+    const fechaHoraEvento = new Date(`${fecha}T${hora}`);
+    const ahora = new Date();
+    const minutosDiferencia = (fechaHoraEvento - ahora) / (1000 * 60);
+
+    if (minutosDiferencia < 30) {
+      return res.status(400).json({
+        mensaje: 'La reunión debe crearse con al menos 30 minutos de anticipación',
+      });
+    }
+
     const duplicado = await Evento.findOne({ where: { nombre, fecha, hora } });
     if (duplicado) {
       return res.status(400).json({ mensaje: 'Ya existe una reunión con el mismo nombre, fecha y hora' });
@@ -39,6 +50,8 @@ const crearEvento = async (req, res) => {
   }
 };
 
+// listarEventos, editarEvento, eliminarEvento se quedan exactamente igual
+
 const listarEventos = async (req, res) => {
   try {
     const eventos = await Evento.findAll({
@@ -58,6 +71,19 @@ const editarEvento = async (req, res) => {
     const evento = await Evento.findByPk(id);
     if (!evento) {
       return res.status(404).json({ mensaje: 'Evento no encontrado' });
+    }
+
+    // Validar que la nueva fecha/hora no sea en el pasado ni con menos de 30 min de anticipación
+    const fechaFinal = fecha || evento.fecha;
+    const horaFinal = hora || evento.hora;
+    const fechaHoraEvento = new Date(`${fechaFinal}T${horaFinal}`);
+    const ahora = new Date();
+    const minutosDiferencia = (fechaHoraEvento - ahora) / (1000 * 60);
+
+    if (minutosDiferencia < 30) {
+      return res.status(400).json({
+        mensaje: 'La reunión debe quedar programada con al menos 30 minutos de anticipación',
+      });
     }
 
     const tieneAsistencias = await Asistencia.findOne({
@@ -105,5 +131,24 @@ const eliminarEvento = async (req, res) => {
     res.status(500).json({ mensaje: 'Error al eliminar evento', error: error.message });
   }
 };
+const misEventos = async (req, res) => {
+  try {
+    const usuarioId = req.usuario.id; // viene del token, no del body ni params
 
-module.exports = { crearEvento, listarEventos, editarEvento, eliminarEvento };
+    const eventos = await Evento.findAll({
+      include: [{
+        model: Participante,
+        where: { usuarioId },
+        attributes: [],
+      }],
+      order: [['fecha', 'ASC']],
+    });
+
+    res.json({ eventos });
+  } catch (error) {
+    console.error('Error en misEventos:', error);
+    res.status(500).json({ mensaje: 'Error al obtener tus eventos', error: error.message });
+  }
+};
+
+module.exports = { crearEvento, listarEventos, editarEvento, eliminarEvento, misEventos };
