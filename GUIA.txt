@@ -1,0 +1,63 @@
+Descripción completa del proyecto
+¿Qué es?
+
+Un sistema que digitaliza el control de asistencia a reuniones y capacitaciones, reemplazando el registro manual en papel. Se basa en un QR único por reunión: el Administrador u Operador crea el evento, el sistema genera un código QR asociado a ese evento específico, y los participantes lo escanean para registrar su asistencia automáticamente.
+
+Actores del sistema
+Administrador — control total: crea/edita/elimina eventos, gestiona usuarios, ve reportes.
+Operador — gestiona eventos y registra asistencia (QR, invitado, manual), como apoyo operativo del día a día.
+Miembro — colaborador con cuenta; solo ve las reuniones a las que fue convocado y registra su propia asistencia escaneando el QR.
+Invitado — persona externa sin cuenta; se registra con nombre y cédula solo si la reunión es de tipo "abierta".
+Regla de negocio central
+
+Cada evento tiene una toleranciaMin (por defecto 20 minutos). Si el check-in ocurre dentro de ese margen desde la hora de inicio, queda como presente; después, como tardío. Quien nunca hace check-in queda como ausente en el reporte.
+
+Flujo del QR
+Un evento se crea con tipoReunion: 'solo_miembros' (solo convocados) o 'abierta' (convocados + invitados).
+Al crearse, se genera automáticamente una imagen QR (usando la librería qrcode) que codifica una URL con el id del evento, y se guarda en base de datos como base64.
+Al escanear: si es Miembro, inicia sesión y el sistema valida que esté convocado (en reuniones solo_miembros); si es Invitado, ingresa nombre y cédula (solo permitido en reuniones abiertas).
+Modelo de datos
+Usuario — nombre, cédula, correo, passwordHash, rol (Administrador, Operador, Miembro, Invitado).
+Evento — nombre, fecha, hora, lugar, toleranciaMin, tipoReunion, codigoQr.
+Participante — tabla intermedia entre Usuario y Evento; representa la convocatoria (quién fue invitado a qué evento), independiente de si asistió o no.
+Asistencia — el check-in real: hora de ingreso, método (qr/manual), estado (presente/tardio/ausente).
+Seguridad
+
+Autenticación con JWT: al hacer login, el backend verifica la contraseña con bcrypt y entrega un token firmado (válido 8h) con { id, rol } adentro. Cada ruta protegida exige ese token (verificarToken), y algunas exigen además un rol específico (soloAdmin, soloOperador). Reglas aplicadas:
+
+Acción	Quién puede
+Crear/editar/eliminar reuniones	Admin y Operador
+Registrar asistencia (QR, invitado, manual)	Admin y Operador
+Crear/editar/eliminar usuarios	Solo Admin
+Ver reportes	Solo Admin
+Consultar eventos	Cualquiera autenticado (Miembro solo ve los suyos vía /mis-eventos)
+Stack tecnológico
+Backend: Node.js + Express
+ORM: Sequelize
+Base de datos: PostgreSQL alojado en Render
+Autenticación: bcryptjs (hash de contraseñas) + jsonwebtoken (tokens)
+Generación de QR: paquete qrcode
+Pruebas: Postman
+Endpoints principales
+Ruta	Método	Función
+/api/auth/login	POST	Login, devuelve token
+/api/eventos	POST / GET	Crear / listar eventos
+/api/eventos/mis-eventos	GET	Eventos del Miembro logueado
+/api/eventos/:id	PUT / DELETE	Editar / eliminar evento
+/api/usuarios	POST / GET	Crear / listar usuarios (solo Admin)
+/api/asistencia/check-in-qr	POST	Check-in de Miembro por QR
+/api/asistencia/check-in-invitado	POST	Check-in de Invitado
+/api/asistencia/eventos/:id/asistencia-manual	POST	Check-in manual (Operador/Admin)
+/api/asistencia/eventos/:id/reporte	GET	Reporte de presentes/tardíos/ausentes
+Cómo se ejecuta
+bash
+cd Backend
+npm run dev
+
+Levanta el servidor con nodemon, conecta a PostgreSQL en Render usando DATABASE_URL del .env, sincroniza los modelos con Sequelize y expone la API en http://localhost:3000.
+
+Reglas adicionales ya implementadas
+No se pueden crear/editar eventos con fecha en el pasado, ni con menos de 30 minutos de anticipación.
+No se permiten reuniones duplicadas (mismo nombre, fecha y hora).
+No se puede editar o eliminar un evento que ya tiene asistencias registradas.
+Una persona no puede registrar asistencia dos veces en el mismo evento.

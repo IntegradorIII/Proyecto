@@ -6,6 +6,10 @@ const login = async (req, res) => {
   try {
     const { correo, password } = req.body;
 
+    if (!correo || !password) {
+      return res.status(400).json({ mensaje: 'Correo y contraseña son obligatorios' });
+    }
+
     const usuario = await Usuario.findOne({ where: { correo } });
     if (!usuario) {
       return res.status(401).json({ mensaje: 'Credenciales invalidas' });
@@ -33,8 +37,8 @@ const login = async (req, res) => {
     });
   } catch (error) {
     console.error('Error en login:', error);
-    res.status(500).json({ mensaje: 'Error al iniciar sesion', error: error.message });
+    res.status(500).json({ mensaje: 'Error interno del servidor al iniciar sesión' });
   }
 };
 
-module.exports = { login };
+module.exports = { login };

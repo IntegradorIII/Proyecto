@@ -31,9 +31,13 @@ const PORT = process.env.PORT || 3000;
 const iniciar = async () => {
   await conectar();
   await sequelize.sync({ alter: true });
-  app.listen(PORT, () => {
+  return app.listen(PORT, () => {
     console.log(`Servidor corriendo en http://localhost:${PORT}`);
   });
 };
 
-iniciar();
+if (require.main === module) {
+  iniciar();
+}
+
+module.exports = { app, iniciar };

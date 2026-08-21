@@ -3,6 +3,13 @@ const Asistencia = require('../models/Asistencia');
 const Participante = require('../models/Participante');
 const QRCode = require('qrcode');
 
+const construirFechaHora = (fecha, hora) => {
+  if (!fecha || !hora) return null;
+  const [year, month, day] = fecha.split('-').map(Number);
+  const [hours, minutes, seconds = 0] = hora.split(':').map(Number);
+  return new Date(year, month - 1, day, hours, minutes, seconds);
+};
+
 const crearEvento = async (req, res) => {
   try {
     const { nombre, fecha, hora, lugar, toleranciaMin, tipoReunion } = req.body;
@@ -11,14 +18,16 @@ const crearEvento = async (req, res) => {
       return res.status(400).json({ mensaje: 'Todos los campos son obligatorios' });
     }
 
-    // Validar que la reunión no sea en el pasado ni con menos de 30 min de anticipación
-    const fechaHoraEvento = new Date(`${fecha}T${hora}`);
-    const ahora = new Date();
-    const minutosDiferencia = (fechaHoraEvento - ahora) / (1000 * 60);
+    const fechaHoraEvento = construirFechaHora(fecha, hora);
+    if (!fechaHoraEvento || isNaN(fechaHoraEvento.getTime())) {
+      return res.status(400).json({ mensaje: 'Formato de fecha u hora inválido' });
+    }
 
-    if (minutosDiferencia < 30) {
+    const ahora = new Date();
+    const diffMinutos = (fechaHoraEvento - ahora) / (1000 * 60);
+    if (diffMinutos < 30) {
       return res.status(400).json({
-        mensaje: 'La reunión debe crearse con al menos 30 minutos de anticipación',
+        mensaje: 'No se pueden crear eventos en el pasado ni con menos de 30 minutos de anticipación',
       });
     }
 
@@ -28,15 +37,15 @@ const crearEvento = async (req, res) => {
     }
 
     const nuevoEvento = await Evento.create({
-      nombre,
+      nombre: nombre.trim(),
       fecha,
       hora,
-      lugar,
-      toleranciaMin: toleranciaMin || 20,
+      lugar: lugar.trim(),
+      toleranciaMin: toleranciaMin ? parseInt(toleranciaMin, 10) : 20,
       tipoReunion: tipoReunion || 'solo_miembros',
     });
 
-    const contenidoQR = `${process.env.APP_URL}/reunion/${nuevoEvento.id}`;
+    const contenidoQR = `${process.env.APP_URL || 'http://localhost:3000'}/reunion/${nuevoEvento.id}`;
     const codigoQr = await QRCode.toDataURL(contenidoQR);
     await nuevoEvento.update({ codigoQr });
 
@@ -46,44 +55,66 @@ const crearEvento = async (req, res) => {
     });
   } catch (error) {
     console.error('Error en crearEvento:', error);
-    res.status(500).json({ mensaje: 'Error al crear evento', error: error.message });
+    res.status(500).json({ mensaje: 'Error interno del servidor al crear evento' });
   }
 };
 
-// listarEventos, editarEvento, eliminarEvento se quedan exactamente igual
-
 const listarEventos = async (req, res) => {
   try {
+    if (req.usuario && req.usuario.rol === 'Miembro') {
+      const participaciones = await Participante.findAll({
+        where: { usuarioId: req.usuario.id },
+        include: [
+          {
+            model: Evento,
+            attributes: ['id', 'nombre', 'fecha', 'hora', 'lugar', 'toleranciaMin', 'tipoReunion'],
+          },
+        ],
+        order: [[Evento, 'fecha', 'ASC']],
+      });
+      const eventos = participaciones.map(p => p.Evento).filter(Boolean);
+      return res.json({ eventos });
+    }
+
     const eventos = await Evento.findAll({
       order: [['fecha', 'ASC']],
     });
     res.json({ eventos });
   } catch (error) {
     console.error('Error en listarEventos:', error);
-    res.status(500).json({ mensaje: 'Error al obtener eventos', error: error.message });
+    res.status(500).json({ mensaje: 'Error interno del servidor al obtener eventos' });
   }
 };
+
+const misEventos = async (req, res) => {
+  try {
+    const usuarioId = req.usuario.id;
+    const participaciones = await Participante.findAll({
+      where: { usuarioId },
+      include: [
+        {
+          model: Evento,
+          attributes: ['id', 'nombre', 'fecha', 'hora', 'lugar', 'toleranciaMin', 'tipoReunion'],
+        },
+      ],
+      order: [[Evento, 'fecha', 'ASC']],
+    });
+    const eventos = participaciones.map(p => p.Evento).filter(Boolean);
+    res.json({ eventos });
+  } catch (error) {
+    console.error('Error en misEventos:', error);
+    res.status(500).json({ mensaje: 'Error interno del servidor al obtener sus eventos' });
+  }
+};
+
 const editarEvento = async (req, res) => {
   try {
     const { id } = req.params;
-    const { nombre, fecha, hora, lugar, toleranciaMin } = req.body;
+    const { nombre, fecha, hora, lugar, toleranciaMin, tipoReunion } = req.body;
 
     const evento = await Evento.findByPk(id);
     if (!evento) {
       return res.status(404).json({ mensaje: 'Evento no encontrado' });
-    }
-
-    // Validar que la nueva fecha/hora no sea en el pasado ni con menos de 30 min de anticipación
-    const fechaFinal = fecha || evento.fecha;
-    const horaFinal = hora || evento.hora;
-    const fechaHoraEvento = new Date(`${fechaFinal}T${horaFinal}`);
-    const ahora = new Date();
-    const minutosDiferencia = (fechaHoraEvento - ahora) / (1000 * 60);
-
-    if (minutosDiferencia < 30) {
-      return res.status(400).json({
-        mensaje: 'La reunión debe quedar programada con al menos 30 minutos de anticipación',
-      });
     }
 
     const tieneAsistencias = await Asistencia.findOne({
@@ -96,12 +127,31 @@ const editarEvento = async (req, res) => {
       return res.status(400).json({ mensaje: 'No se puede editar un evento que ya tiene asistencias registradas' });
     }
 
-    await evento.update({ nombre, fecha, hora, lugar, toleranciaMin });
+    const fechaFinal = fecha || evento.fecha;
+    const horaFinal = hora || evento.hora;
+    const fechaHoraEvento = construirFechaHora(fechaFinal, horaFinal);
+    const ahora = new Date();
+    const diffMinutos = (fechaHoraEvento - ahora) / (1000 * 60);
+
+    if (diffMinutos < 30) {
+      return res.status(400).json({
+        mensaje: 'No se puede reprogramar el evento con menos de 30 minutos de anticipación o en el pasado',
+      });
+    }
+
+    await evento.update({
+      nombre: nombre !== undefined ? nombre.trim() : evento.nombre,
+      fecha: fechaFinal,
+      hora: horaFinal,
+      lugar: lugar !== undefined ? lugar.trim() : evento.lugar,
+      toleranciaMin: toleranciaMin !== undefined ? parseInt(toleranciaMin, 10) : evento.toleranciaMin,
+      tipoReunion: tipoReunion || evento.tipoReunion,
+    });
 
     res.json({ mensaje: 'Evento actualizado correctamente', evento });
   } catch (error) {
     console.error('Error en editarEvento:', error);
-    res.status(500).json({ mensaje: 'Error al editar evento', error: error.message });
+    res.status(500).json({ mensaje: 'Error interno del servidor al editar evento' });
   }
 };
 
@@ -124,31 +174,15 @@ const eliminarEvento = async (req, res) => {
       return res.status(400).json({ mensaje: 'No se puede eliminar un evento que ya tiene asistencias registradas' });
     }
 
+    // Eliminar participantes asociados si los hay
+    await Participante.destroy({ where: { eventoId: id } });
     await evento.destroy();
+
     res.json({ mensaje: 'Evento eliminado correctamente' });
   } catch (error) {
     console.error('Error en eliminarEvento:', error);
-    res.status(500).json({ mensaje: 'Error al eliminar evento', error: error.message });
-  }
-};
-const misEventos = async (req, res) => {
-  try {
-    const usuarioId = req.usuario.id; // viene del token, no del body ni params
-
-    const eventos = await Evento.findAll({
-      include: [{
-        model: Participante,
-        where: { usuarioId },
-        attributes: [],
-      }],
-      order: [['fecha', 'ASC']],
-    });
-
-    res.json({ eventos });
-  } catch (error) {
-    console.error('Error en misEventos:', error);
-    res.status(500).json({ mensaje: 'Error al obtener tus eventos', error: error.message });
+    res.status(500).json({ mensaje: 'Error interno del servidor al eliminar evento' });
   }
 };
 
-module.exports = { crearEvento, listarEventos, editarEvento, eliminarEvento, misEventos };
+module.exports = { crearEvento, listarEventos, misEventos, editarEvento, eliminarEvento };

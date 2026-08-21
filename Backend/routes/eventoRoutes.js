@@ -1,7 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const { verificarToken, soloOperador } = require('../middleware/auth');
-const { crearEvento, listarEventos, editarEvento, eliminarEvento, misEventos } = require('../controllers/eventoController');
+const {
+  crearEvento,
+  listarEventos,
+  misEventos,
+  editarEvento,
+  eliminarEvento,
+} = require('../controllers/eventoController');
 const { asociarParticipante, listarParticipantes } = require('../controllers/participanteController');
 
 router.post('/', verificarToken, soloOperador, crearEvento);
