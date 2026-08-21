@@ -1,63 +1,273 @@
-Descripción completa del proyecto
-¿Qué es?
+======================================================================
+GUÍA TÉCNICA Y FUNCIONAL DEL PROYECTO - SISTEMA DE CONTROL DE ASISTENCIA
+======================================================================
 
-Un sistema que digitaliza el control de asistencia a reuniones y capacitaciones, reemplazando el registro manual en papel. Se basa en un QR único por reunión: el Administrador u Operador crea el evento, el sistema genera un código QR asociado a ese evento específico, y los participantes lo escanean para registrar su asistencia automáticamente.
+1. DESCRIPCIÓN GENERAL DEL PROYECTO
+----------------------------------------------------------------------
+Sistema integral para la digitalización y automatización del control de 
+asistencia a reuniones, eventos y capacitaciones corporativas/institucionales, 
+reemplazando el registro manual en papel.
 
-Actores del sistema
-Administrador — control total: crea/edita/elimina eventos, gestiona usuarios, ve reportes.
-Operador — gestiona eventos y registra asistencia (QR, invitado, manual), como apoyo operativo del día a día.
-Miembro — colaborador con cuenta; solo ve las reuniones a las que fue convocado y registra su propia asistencia escaneando el QR.
-Invitado — persona externa sin cuenta; se registra con nombre y cédula solo si la reunión es de tipo "abierta".
-Regla de negocio central
+El sistema opera mediante la generación de códigos QR dinámicos únicos por 
+reunión: el Administrador u Operador programa un evento, el backend genera 
+automáticamente el código QR correspondiente y los asistentes registran su 
+asistencia escaneando el código desde sus dispositivos o mediante registro 
+manual por parte del operador.
 
-Cada evento tiene una toleranciaMin (por defecto 20 minutos). Si el check-in ocurre dentro de ese margen desde la hora de inicio, queda como presente; después, como tardío. Quien nunca hace check-in queda como ausente en el reporte.
 
-Flujo del QR
-Un evento se crea con tipoReunion: 'solo_miembros' (solo convocados) o 'abierta' (convocados + invitados).
-Al crearse, se genera automáticamente una imagen QR (usando la librería qrcode) que codifica una URL con el id del evento, y se guarda en base de datos como base64.
-Al escanear: si es Miembro, inicia sesión y el sistema valida que esté convocado (en reuniones solo_miembros); si es Invitado, ingresa nombre y cédula (solo permitido en reuniones abiertas).
-Modelo de datos
-Usuario — nombre, cédula, correo, passwordHash, rol (Administrador, Operador, Miembro, Invitado).
-Evento — nombre, fecha, hora, lugar, toleranciaMin, tipoReunion, codigoQr.
-Participante — tabla intermedia entre Usuario y Evento; representa la convocatoria (quién fue invitado a qué evento), independiente de si asistió o no.
-Asistencia — el check-in real: hora de ingreso, método (qr/manual), estado (presente/tardio/ausente).
-Seguridad
+2. ACTORES DEL SISTEMA Y ROLES
+----------------------------------------------------------------------
+El sistema implementa Control de Acceso Basado en Roles (RBAC):
 
-Autenticación con JWT: al hacer login, el backend verifica la contraseña con bcrypt y entrega un token firmado (válido 8h) con { id, rol } adentro. Cada ruta protegida exige ese token (verificarToken), y algunas exigen además un rol específico (soloAdmin, soloOperador). Reglas aplicadas:
+* Administrador:
+  - Control total del sistema.
+  - Gestión completa de usuarios (crear, listar, editar, eliminar).
+  - Creación, edición y eliminación de eventos.
+  - Convocatoria y gestión de participantes.
+  - Registro de asistencia manual y consulta de reportes consolidados.
 
-Acción	Quién puede
-Crear/editar/eliminar reuniones	Admin y Operador
-Registrar asistencia (QR, invitado, manual)	Admin y Operador
-Crear/editar/eliminar usuarios	Solo Admin
-Ver reportes	Solo Admin
-Consultar eventos	Cualquiera autenticado (Miembro solo ve los suyos vía /mis-eventos)
-Stack tecnológico
-Backend: Node.js + Express
-ORM: Sequelize
-Base de datos: PostgreSQL alojado en Render
-Autenticación: bcryptjs (hash de contraseñas) + jsonwebtoken (tokens)
-Generación de QR: paquete qrcode
-Pruebas: Postman
-Endpoints principales
-Ruta	Método	Función
-/api/auth/login	POST	Login, devuelve token
-/api/eventos	POST / GET	Crear / listar eventos
-/api/eventos/mis-eventos	GET	Eventos del Miembro logueado
-/api/eventos/:id	PUT / DELETE	Editar / eliminar evento
-/api/usuarios	POST / GET	Crear / listar usuarios (solo Admin)
-/api/asistencia/check-in-qr	POST	Check-in de Miembro por QR
-/api/asistencia/check-in-invitado	POST	Check-in de Invitado
-/api/asistencia/eventos/:id/asistencia-manual	POST	Check-in manual (Operador/Admin)
-/api/asistencia/eventos/:id/reporte	GET	Reporte de presentes/tardíos/ausentes
-Cómo se ejecuta
-bash
-cd Backend
-npm run dev
+* Operador:
+  - Gestión operativa del día a día.
+  - Creación, edición y eliminación de eventos.
+  - Convocatoria de participantes a eventos.
+  - Registro de asistencia manual (para miembros e invitados).
+  - Consulta del listado general de eventos y participantes convocados.
 
-Levanta el servidor con nodemon, conecta a PostgreSQL en Render usando DATABASE_URL del .env, sincroniza los modelos con Sequelize y expone la API en http://localhost:3000.
+* Miembro:
+  - Usuario registrado en la plataforma (colaborador/asistente).
+  - Consulta exclusivamente las reuniones a las que ha sido convocado (/api/eventos/mis-eventos).
+  - Registra su propia asistencia escaneando el código QR del evento.
 
-Reglas adicionales ya implementadas
-No se pueden crear/editar eventos con fecha en el pasado, ni con menos de 30 minutos de anticipación.
-No se permiten reuniones duplicadas (mismo nombre, fecha y hora).
-No se puede editar o eliminar un evento que ya tiene asistencias registradas.
-Una persona no puede registrar asistencia dos veces en el mismo evento.
+* Invitado:
+  - Persona externa sin cuenta fija en el sistema.
+  - Puede registrar su asistencia mediante nombre y cédula en el endpoint 
+    público de invitados, únicamente en reuniones configuradas como "abierta".
+  - El sistema le crea automáticamente una cuenta temporal con rol 'Invitado'.
+
+
+3. REGLAS DE NEGOCIO Y VALIDACIONES
+----------------------------------------------------------------------
+a) Creación y Gestión de Eventos:
+   - Los eventos deben programarse con al menos 30 minutos de anticipación 
+     respecto a la hora actual.
+   - No se permiten reuniones en el pasado.
+   - Validación de duplicidad: No se permite crear eventos con el mismo 
+     nombre, fecha y hora.
+   - Bloqueo de modificación/eliminación: No se puede editar ni eliminar un 
+     evento si ya cuenta con asistencias registradas.
+   - Eliminación limpia: Al eliminar un evento (sin asistencias), se eliminan 
+     en cascada sus participantes convocados.
+
+b) Tipos de Reunión y Convocatoria:
+   - solo_miembros: Exclusivo para usuarios registrados previamente convocados 
+     (tabla Participante). Los invitados externos son rechazados (HTTP 403).
+   - abierta: Permite tanto a miembros convocados como a personas externas 
+     (invitados), asociando automáticamente al participante al momento del check-in.
+
+c) Control de Tiempos de Check-in (Ventana de Asistencia):
+   - Registro anticipado limitado: No se permite registrar asistencia con más 
+     de 15 minutos de antelación al inicio del evento.
+   - Cierre de registro: El registro se deshabilita automáticamente tras 
+     4 horas (240 minutos) de haber iniciado el evento.
+   - Cálculo de Estado (toleranciaMin, por defecto 20 minutos):
+     * Presente: Check-in realizado dentro de la ventana de tolerancia desde la 
+       hora de inicio.
+     * Tardío: Check-in realizado después de la tolerancia pero dentro de las 4 horas.
+     * Ausente: Usuarios convocados que no realizaron check-in (calculado en reportes).
+
+d) Unicidad de Asistencia:
+   - Un usuario/invitado no puede registrar asistencia más de una vez en el 
+     mismo evento (HTTP 409 Conflict).
+
+e) Gestión de Usuarios y Seguridad de Cuentas:
+   - Contraseñas con longitud mínima de 5 caracteres, hasheadas con bcryptjs (coste 10).
+   - Validación estricta de formato de correo electrónico.
+   - Unicidad de cédula y correo electrónico en creación y edición.
+   - Bloqueo de autoeliminación: Un administrador no puede eliminar su propia cuenta.
+
+
+4. MODELO DE DATOS (SEQUELIZE / POSTGRESQL)
+----------------------------------------------------------------------
+* Usuario (tabla 'usuarios'):
+  - id: INTEGER (PK, auto-incremental)
+  - nombre: STRING (obligatorio)
+  - cedula: STRING (obligatorio, único)
+  - correo: STRING (obligatorio, único)
+  - passwordHash: STRING (obligatorio)
+  - rol: ENUM ('Administrador', 'Operador', 'Miembro', 'Invitado')
+  - createdAt / updatedAt: TIMESTAMP
+
+* Evento (tabla 'eventos'):
+  - id: INTEGER (PK, auto-incremental)
+  - nombre: STRING (obligatorio)
+  - fecha: DATEONLY (YYYY-MM-DD, obligatorio)
+  - hora: TIME (HH:MM:SS, obligatorio)
+  - lugar: STRING (obligatorio)
+  - toleranciaMin: INTEGER (por defecto 20)
+  - tipoReunion: ENUM ('solo_miembros', 'abierta', por defecto 'solo_miembros')
+  - codigoQr: TEXT (Data URL base64 de la imagen QR generada)
+  - createdAt / updatedAt: TIMESTAMP
+
+* Participante (tabla 'participantes'):
+  - id: INTEGER (PK, auto-incremental)
+  - usuarioId: INTEGER (FK -> Usuario.id)
+  - eventoId: INTEGER (FK -> Evento.id)
+  - createdAt / updatedAt: TIMESTAMP
+  * Relaciones: N a M entre Usuario y Evento (representa la convocatoria).
+
+* Asistencia (tabla 'asistencias'):
+  - id: INTEGER (PK, auto-incremental)
+  - participanteId: INTEGER (FK -> Participante.id, único 1:1)
+  - horaIngreso: DATE (TIMESTAMP, por defecto NOW)
+  - metodo: ENUM ('qr', 'manual')
+  - estado: ENUM ('presente', 'tardio', 'ausente', por defecto 'presente')
+  - createdAt / updatedAt: TIMESTAMP
+
+
+5. SEGURIDAD Y CONTROL DE PETICIONES
+----------------------------------------------------------------------
+* Autenticación con JWT (JSON Web Tokens):
+  - Token firmado con clave secreta (JWT_SECRET) y expiración de 8 horas.
+  - Payload contiene { id, rol }.
+  - Middleware verificarToken valida el encabezado 'Authorization: Bearer <token>'.
+
+* Middlewares de Autorización:
+  - soloAdmin: Exclusivo para rol 'Administrador'.
+  - soloOperador: Permite roles 'Operador' o 'Administrador'.
+
+* Mitigación de IDOR / BOLA (Broken Object Level Authorization):
+  - En check-in por QR (/api/asistencia/check-in-qr), el usuarioId se obtiene 
+    estrictamente del token JWT verificado (req.usuario.id), imposibilitando 
+    la suplantación de identidad mediante alteración del payload en la petición.
+
+* Rate Limiting (express-rate-limit):
+  - loginLimiter: Máximo 10 intentos de autenticación cada 15 minutos por IP.
+  - checkInLimiter: Máximo 30 solicitudes de check-in por minuto por IP.
+
+* Manejo Seguro de Errores:
+  - Mensajes de excepción de base de datos y detalles internos no se exponen 
+    al cliente en respuestas de error 500.
+
+
+6. MATRIZ DE PERMISOS
+----------------------------------------------------------------------
+Acción                              | Admin | Operador | Miembro | Invitado
+------------------------------------+-------+----------+---------+---------
+Crear / Editar / Eliminar Eventos   |   SÍ  |    SÍ    |    NO   |    NO
+Convocar Participantes a Evento     |   SÍ  |    SÍ    |    NO   |    NO
+Consultar Todos los Eventos         |   SÍ  |    SÍ    |    SÍ*  |    NO
+Consultar "Mis Eventos" Convocados  |   SÍ  |    SÍ    |    SÍ   |    NO
+Registrar Check-in Propio por QR    |   SÍ  |    SÍ    |    SÍ   |    NO
+Registrar Check-in de Invitado      | Público (Reuniones abiertas)
+Registrar Asistencia Manual         |   SÍ  |    SÍ    |    NO   |    NO
+Crear / Editar / Eliminar Usuarios  |   SÍ  |    NO    |    NO   |    NO
+Ver Reporte de Asistencia           |   SÍ  |    NO    |    NO   |    NO
+
+* Nota: El endpoint general /api/eventos requiere autenticación; para Miembros 
+se dispone de /api/eventos/mis-eventos con filtrado seguro por usuario.
+
+
+7. CATÁLOGO DE ENDPOINTS DE LA API
+----------------------------------------------------------------------
+
+--- AUTENTICACIÓN (/api/auth) ---
+* POST /api/auth/login
+  - Rate Limit: loginLimiter (10 pet/15 min)
+  - Auth: Pública
+  - Body: { "correo": "admin@test.com", "password": "secretpassword" }
+  - Retorna: { "token": "...", "usuario": { "id", "nombre", "correo", "rol" } }
+
+--- EVENTOS (/api/eventos) ---
+* POST /api/eventos
+  - Auth: verificarToken, soloOperador (Admin / Operador)
+  - Body: { "nombre", "fecha", "hora", "lugar", "toleranciaMin", "tipoReunion" }
+  - Retorna: Evento creado con código QR en base64.
+* GET /api/eventos
+  - Auth: verificarToken
+  - Retorna: Listado completo de eventos ordenados por fecha.
+* GET /api/eventos/mis-eventos
+  - Auth: verificarToken (Cualquier usuario autenticado)
+  - Retorna: Listado de eventos a los que el usuario logueado está convocado.
+* PUT /api/eventos/:id
+  - Auth: verificarToken, soloOperador
+  - Body: Campos a actualizar (nombre, fecha, hora, lugar, toleranciaMin, tipoReunion)
+* DELETE /api/eventos/:id
+  - Auth: verificarToken, soloOperador
+  - Elimina el evento si no tiene asistencias registradas.
+
+--- PARTICIPANTES / CONVOCATORIAS (/api/eventos/:id/participantes) ---
+* POST /api/eventos/:id/participantes  (o /api/participantes/:id/participantes)
+  - Auth: verificarToken, soloOperador
+  - Body: { "usuarioId": 2 }
+  - Asocia un usuario al evento.
+* GET /api/eventos/:id/participantes   (o /api/participantes/:id/participantes)
+  - Auth: verificarToken
+  - Retorna: Lista de participantes convocados con datos del usuario.
+
+--- ASISTENCIA Y CHECK-IN (/api/asistencia) ---
+* POST /api/asistencia/check-in-qr
+  - Rate Limit: checkInLimiter (30 pet/min)
+  - Auth: verificarToken
+  - Body: { "eventoId": 1 }
+  - Registra asistencia del usuario autenticado (ID extraído del token).
+* POST /api/asistencia/check-in-invitado
+  - Rate Limit: checkInLimiter (30 pet/min)
+  - Auth: Pública
+  - Body: { "eventoId": 1, "nombre": "Carlos Perez", "cedula": "12345678" }
+  - Registra asistencia de invitado en reuniones abiertas.
+* POST /api/asistencia/eventos/:id/asistencia-manual
+  - Auth: verificarToken, soloOperador
+  - Body: { "usuarioId": 3 } O BIEN { "nombre": "Ana Gomez", "cedula": "87654321", "estadoPersonalizado": "presente" }
+  - Registra check-in manual con asignación de estado automática o personalizada.
+* GET /api/asistencia/eventos/:id/reporte
+  - Auth: verificarToken, soloAdmin
+  - Retorna: Métricas totales (presentes, tardíos, ausentes) y lista detallada.
+
+--- USUARIOS (/api/usuarios) ---
+* POST /api/usuarios
+  - Auth: verificarToken, soloAdmin
+  - Body: { "nombre", "cedula", "correo", "password", "rol" }
+* GET /api/usuarios
+  - Auth: verificarToken, soloAdmin
+  - Retorna: Listado completo de usuarios registrados.
+* PUT /api/usuarios/:id
+  - Auth: verificarToken, soloAdmin
+  - Body: Campos a actualizar (nombre, cedula, correo, password, rol)
+* DELETE /api/usuarios/:id
+  - Auth: verificarToken, soloAdmin
+  - Elimina usuario (bloqueado para autoeliminación).
+
+
+8. STACK TECNOLÓGICO
+----------------------------------------------------------------------
+* Runtime: Node.js
+* Framework web: Express
+* ORM: Sequelize v6
+* Base de datos: PostgreSQL (alojado en la nube en Render)
+* Criptografía y Tokens: bcryptjs, jsonwebtoken
+* Generación de códigos QR: paquete qrcode
+* Seguridad y Rate Limiting: express-rate-limit, cors
+* Configuración de entorno: dotenv
+* Pruebas y consumo: Postman
+
+
+9. GUÍA DE EJECUCIÓN LOCAL
+----------------------------------------------------------------------
+1. Requisitos:
+   - Node.js (versión 16 o superior)
+   - Acceso a internet para conectar con la base de datos en Render.
+
+2. Configuración de Variables de Entorno (Backend/.env):
+   PORT=3000
+   DATABASE_URL=postgresql://<usuario>:<password>@<host>/<database>?ssl=true
+   JWT_SECRET=<clave_secreta_jwt>
+
+3. Instalación y Puesta en Marcha:
+   $ cd Backend
+   $ npm install
+   $ npm run dev
+
+   El servidor levantará en http://localhost:3000 con nodemon, conectará 
+   a PostgreSQL, sincronizará los modelos mediante sequelize.sync({ alter: true }) 
+   y quedará listo para recibir peticiones.
+======================================================================
