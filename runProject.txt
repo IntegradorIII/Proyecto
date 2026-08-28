@@ -1,0 +1,79 @@
+======================================================================
+GUÍA DE EJECUCIÓN RÁPIDA DEL PROYECTO (RUNPROJECT)
+======================================================================
+
+Este archivo contiene el paso a paso detallado y los comandos exactos 
+para levantar el Backend y los clientes (Web, Escritorio o Móvil).
+
+----------------------------------------------------------------------
+1. REQUISITOS PREVIOS
+----------------------------------------------------------------------
+- Node.js instalado (versión 16 o superior).
+- Flutter SDK instalado (versión 3.11 o superior).
+- Conexión a internet (para conectar con la base de datos PostgreSQL en Render).
+
+----------------------------------------------------------------------
+2. PASO 1: LEVANTAR EL BACKEND (API REST)
+----------------------------------------------------------------------
+Abre una terminal en la raíz del proyecto y ejecuta:
+
+  cd Backend
+  npm install
+  npm run dev
+
+* Resultado esperado:
+  - Consola muestra: "Servidor corriendo en http://localhost:3000"
+  - La conexión con PostgreSQL en la nube (Render) se establece automáticamente 
+    utilizando las variables de entorno incluidas en Backend/.env.
+  - Deja esta terminal abierta en ejecución.
+
+----------------------------------------------------------------------
+3. PASO 2: LEVANTAR EL FRONTEND (CLIENTE FLUTTER)
+----------------------------------------------------------------------
+Abre una SEGUNDA terminal y selecciona la plataforma donde deseas visualizarlo:
+
+A) EJECUTAR EN EL NAVEGADOR WEB (Recomendado - Rápido y cómodo):
+   cd mobileCitas
+   flutter pub get
+   flutter run -d edge
+
+   (O con Google Chrome: flutter run -d chrome)
+   * Se abrirá automáticamente una pestaña en tu navegador con toda la aplicación.
+
+B) EJECUTAR COMO APLICACIÓN DE ESCRITORIO (Windows):
+   cd mobileCitas
+   flutter pub get
+   flutter run -d windows
+
+   * Se compilará y abrirá una ventana nativa de escritorio en Windows.
+
+C) EJECUTAR EN CELULAR O EMULADOR ANDROID (Para probar Escaneo con Cámara):
+   - Conecta tu teléfono Android mediante cable USB (Depuración USB activada) 
+     o inicia un emulador desde Android Studio.
+   - En la terminal ejecuta:
+     cd mobileCitas
+     flutter pub get
+     flutter run
+
+----------------------------------------------------------------------
+4. PASO 3: INICIO DE SESIÓN Y PRUEBAS
+----------------------------------------------------------------------
+1. Una vez abierta la aplicación, inicia sesión con un usuario registrado 
+   (por ejemplo, Administrador u Operador).
+2. Módulos disponibles en la aplicación:
+   - Reuniones: Crear eventos, ver QR generado, convocar asistentes.
+   - Usuarios: Crear y editar colaboradores (solo Administrador).
+   - Asistencia: Registro manual, check-in de invitados y reporte en tiempo real.
+   - Escanear QR: Lector con cámara para check-in instantáneo.
+
+----------------------------------------------------------------------
+5. NOTA SOBRE CONFIGURACIÓN DE RED (URLs de la API)
+----------------------------------------------------------------------
+En mobileCitas/lib/core/network/api_constants.dart:
+- Por defecto, la app apunta al backend de producción en Render:
+  https://backend-citas-8z3g.onrender.com
+- Si deseas que apunte a tu backend local (http://localhost:3000):
+  * Web / Windows: http://localhost:3000
+  * Emulador Android: http://10.0.2.2:3000
+  * Dispositivo físico (Misma red WiFi): http://<TU_IP_LOCAL>:3000
+======================================================================

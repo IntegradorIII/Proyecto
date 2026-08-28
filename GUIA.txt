@@ -1,94 +1,122 @@
 ======================================================================
-GUÍA TÉCNICA Y FUNCIONAL DEL PROYECTO - SISTEMA DE CONTROL DE ASISTENCIA
+GUÍA TÉCNICA Y FUNCIONAL DEL SISTEMA INTEGRAL DE CONTROL DE ASISTENCIA
 ======================================================================
 
 1. DESCRIPCIÓN GENERAL DEL PROYECTO
 ----------------------------------------------------------------------
-Sistema integral para la digitalización y automatización del control de 
-asistencia a reuniones, eventos y capacitaciones corporativas/institucionales, 
-reemplazando el registro manual en papel.
+Sistema integral cliente-servidor multiplataforma para la digitalización, 
+automatización y gestión de control de asistencia a reuniones, eventos 
+y capacitaciones corporativas o institucionales.
 
-El sistema opera mediante la generación de códigos QR dinámicos únicos por 
-reunión: el Administrador u Operador programa un evento, el backend genera 
-automáticamente el código QR correspondiente y los asistentes registran su 
-asistencia escaneando el código desde sus dispositivos o mediante registro 
-manual por parte del operador.
+El ecosistema está compuesto por 3 módulos principales integrados:
+1. Backend (API REST): Desarrollado en Node.js, Express, Sequelize y PostgreSQL.
+2. Frontend (Panel Web / Escritorio): Desarrollado en Flutter para gestión 
+   administrativa en navegadores web y computadoras de escritorio.
+3. mobileCitas (Cliente Móvil / Escáner QR): Desarrollado en Flutter con 
+   soporte nativo para cámara (mobile_scanner) enfocado en check-in rápido, 
+   escaneo de códigos QR y consulta de convocatorias.
 
 
-2. ACTORES DEL SISTEMA Y ROLES
+2. ESTRUCTURA DEL PROYECTO
+----------------------------------------------------------------------
+Proyecto/
+├── Backend/                 # Servidor API REST en Node.js & Express
+│   ├── config/              # Configuración de BD (Sequelize / PostgreSQL)
+│   ├── controllers/         # Lógica de negocio (auth, eventos, asistencia, usuarios, etc.)
+│   ├── middleware/          # Autenticación JWT, control de roles y Rate Limiting
+│   ├── models/              # Modelos Sequelize (Usuario, Evento, Participante, Asistencia)
+│   ├── routes/              # Definición de rutas y endpoints de la API
+│   ├── .env                 # Variables de entorno con conexión a PostgreSQL en Render
+│   ├── .env.example         # Plantilla de variables de entorno
+│   ├── index.js             # Entrada principal del servidor Express
+│   └── package.json         # Dependencias de Node.js
+│
+├── mobileCitas/             # Aplicación Flutter Multiplataforma (Móvil / Web / Windows)
+│   ├── lib/
+│   │   ├── core/            # Red (ApiClient, Dio, Interceptores), Rutas, Sesión y Temas
+│   │   ├── models/          # Modelos Dart (User, Meeting, Participant, Attendance, etc.)
+│   │   ├── screens/         # Vistas: Login, Home, Reuniones, Usuarios, Asistencia, Scanner QR
+│   │   ├── widgets/         # Componentes reutilizables (Sidebar, AppCard, AppButton, etc.)
+│   │   └── main.dart        # Inicialización de Flutter, SessionManager y Route Guards
+│   └── pubspec.yaml         # Dependencias (dio, mobile_scanner, qr_flutter, shared_preferences)
+│
+├── Frontend/                # Cliente Flutter base / alternativo
+├── .gitignore               # Configuración de exclusiones Git (seguridad y rendimiento)
+├── GUIA.txt                 # Documentación técnica y funcional exhaustiva
+├── runProject.txt           # Guía rápida con comandos de ejecución paso a paso
+└── README.md                # Presentación general del proyecto
+
+
+3. ACTORES DEL SISTEMA Y ROLES (RBAC)
 ----------------------------------------------------------------------
 El sistema implementa Control de Acceso Basado en Roles (RBAC):
 
 * Administrador:
-  - Control total del sistema.
-  - Gestión completa de usuarios (crear, listar, editar, eliminar).
-  - Creación, edición y eliminación de eventos.
-  - Convocatoria y gestión de participantes.
-  - Registro de asistencia manual y consulta de reportes consolidados.
+  - Control total del sistema y acceso al módulo completo de Usuarios.
+  - Gestión de usuarios: Crear, listar, editar y eliminar usuarios.
+  - Creación, reprogramación y cancelación de eventos/reuniones.
+  - Convocatoria de participantes a eventos.
+  - Registro de asistencia manual (presente, tardío, ausente).
+  - Consulta y exportación de reportes de asistencia con métricas consolidadas.
 
 * Operador:
   - Gestión operativa del día a día.
-  - Creación, edición y eliminación de eventos.
+  - Creación, reprogramación y eliminación de eventos.
   - Convocatoria de participantes a eventos.
-  - Registro de asistencia manual (para miembros e invitados).
-  - Consulta del listado general de eventos y participantes convocados.
+  - Registro de asistencia manual para miembros e invitados.
+  - Consulta general de eventos y participantes convocados.
 
-* Miembro:
-  - Usuario registrado en la plataforma (colaborador/asistente).
-  - Consulta exclusivamente las reuniones a las que ha sido convocado (/api/eventos/mis-eventos).
-  - Registra su propia asistencia escaneando el código QR del evento.
+* Miembro (Colaborador / Asistente):
+  - Usuario registrado convocado a reuniones institucionales.
+  - Consulta exclusivamente sus reuniones convocadas (/api/eventos/mis-eventos).
+  - Registro autónomo de asistencia escaneando el código QR del evento desde la app.
 
 * Invitado:
-  - Persona externa sin cuenta fija en el sistema.
-  - Puede registrar su asistencia mediante nombre y cédula en el endpoint 
-    público de invitados, únicamente en reuniones configuradas como "abierta".
-  - El sistema le crea automáticamente una cuenta temporal con rol 'Invitado'.
+  - Persona externa sin cuenta registrada previamente en el sistema.
+  - Registro de asistencia con Nombre y Cédula en reuniones abiertas.
+  - Creación automática de cuenta temporal bajo el rol 'Invitado'.
 
 
-3. REGLAS DE NEGOCIO Y VALIDACIONES
+4. REGLAS DE NEGOCIO Y VALIDACIONES
 ----------------------------------------------------------------------
-a) Creación y Gestión de Eventos:
-   - Los eventos deben programarse con al menos 30 minutos de anticipación 
-     respecto a la hora actual.
-   - No se permiten reuniones en el pasado.
+a) Gestión de Eventos / Reuniones:
+   - Anticipación mínima: Los eventos deben crearse con al menos 30 minutos 
+     de anticipación respecto a la hora actual.
    - Validación de duplicidad: No se permite crear eventos con el mismo 
      nombre, fecha y hora.
-   - Bloqueo de modificación/eliminación: No se puede editar ni eliminar un 
-     evento si ya cuenta con asistencias registradas.
-   - Eliminación limpia: Al eliminar un evento (sin asistencias), se eliminan 
-     en cascada sus participantes convocados.
+   - Bloqueo de integridad: No se puede editar ni eliminar un evento si 
+     ya cuenta con registros de asistencia.
+   - Eliminación en cascada: Al eliminar un evento sin asistencias, se 
+     remueven automáticamente sus convocatorias asociadas.
 
-b) Tipos de Reunión y Convocatoria:
-   - solo_miembros: Exclusivo para usuarios registrados previamente convocados 
-     (tabla Participante). Los invitados externos son rechazados (HTTP 403).
-   - abierta: Permite tanto a miembros convocados como a personas externas 
-     (invitados), asociando automáticamente al participante al momento del check-in.
+b) Tipos de Reunión:
+   - solo_miembros: Exclusivo para usuarios previamente convocados en la 
+     tabla Participante. Rechaza invitados externos (HTTP 403).
+   - abierta: Permite tanto a miembros convocados como a invitados externos, 
+     asociándolos automáticamente al realizar el check-in.
 
-c) Control de Tiempos de Check-in (Ventana de Asistencia):
-   - Registro anticipado limitado: No se permite registrar asistencia con más 
-     de 15 minutos de antelación al inicio del evento.
-   - Cierre de registro: El registro se deshabilita automáticamente tras 
-     4 horas (240 minutos) de haber iniciado el evento.
+c) Control de Tiempos de Asistencia (Ventana de Check-in):
+   - Registro anticipado: Se habilita únicamente 15 minutos antes de la hora fijada.
+   - Cierre de registro: El registro se deshabilita automáticamente transcurridas 
+     4 horas (240 minutos) desde el inicio.
    - Cálculo de Estado (toleranciaMin, por defecto 20 minutos):
-     * Presente: Check-in realizado dentro de la ventana de tolerancia desde la 
-       hora de inicio.
+     * Presente: Check-in realizado dentro de la ventana de tolerancia.
      * Tardío: Check-in realizado después de la tolerancia pero dentro de las 4 horas.
-     * Ausente: Usuarios convocados que no realizaron check-in (calculado en reportes).
+     * Ausente: Usuarios convocados que no registraron ingreso (calculado en reporte).
 
 d) Unicidad de Asistencia:
-   - Un usuario/invitado no puede registrar asistencia más de una vez en el 
-     mismo evento (HTTP 409 Conflict).
+   - Un usuario o invitado solo puede registrar asistencia una única vez por evento. 
+     Intentos duplicados responden con HTTP 409 Conflict.
 
-e) Gestión de Usuarios y Seguridad de Cuentas:
+e) Seguridad y Cuentas:
    - Contraseñas con longitud mínima de 5 caracteres, hasheadas con bcryptjs (coste 10).
-   - Validación estricta de formato de correo electrónico.
-   - Unicidad de cédula y correo electrónico en creación y edición.
+   - Validación estricta de unicidad en Cédula y Correo electrónico.
    - Bloqueo de autoeliminación: Un administrador no puede eliminar su propia cuenta.
 
 
-4. MODELO DE DATOS (SEQUELIZE / POSTGRESQL)
+5. MODELO DE DATOS Y RELACIONES (SEQUELIZE / POSTGRESQL)
 ----------------------------------------------------------------------
-* Usuario (tabla 'usuarios'):
+* Usuario ('usuarios'):
   - id: INTEGER (PK, auto-incremental)
   - nombre: STRING (obligatorio)
   - cedula: STRING (obligatorio, único)
@@ -97,177 +125,103 @@ e) Gestión de Usuarios y Seguridad de Cuentas:
   - rol: ENUM ('Administrador', 'Operador', 'Miembro', 'Invitado')
   - createdAt / updatedAt: TIMESTAMP
 
-* Evento (tabla 'eventos'):
+* Evento ('eventos'):
   - id: INTEGER (PK, auto-incremental)
   - nombre: STRING (obligatorio)
-  - fecha: DATEONLY (YYYY-MM-DD, obligatorio)
-  - hora: TIME (HH:MM:SS, obligatorio)
+  - fecha: DATEONLY (YYYY-MM-DD)
+  - hora: TIME (HH:MM:SS)
   - lugar: STRING (obligatorio)
   - toleranciaMin: INTEGER (por defecto 20)
-  - tipoReunion: ENUM ('solo_miembros', 'abierta', por defecto 'solo_miembros')
+  - tipoReunion: ENUM ('solo_miembros', 'abierta')
   - codigoQr: TEXT (Data URL base64 de la imagen QR generada)
   - createdAt / updatedAt: TIMESTAMP
 
-* Participante (tabla 'participantes'):
+* Participante ('participantes'):
   - id: INTEGER (PK, auto-incremental)
   - usuarioId: INTEGER (FK -> Usuario.id)
   - eventoId: INTEGER (FK -> Evento.id)
   - createdAt / updatedAt: TIMESTAMP
-  * Relaciones: N a M entre Usuario y Evento (representa la convocatoria).
+  * Relación N a M entre Usuario y Evento.
 
-* Asistencia (tabla 'asistencias'):
+* Asistencia ('asistencias'):
   - id: INTEGER (PK, auto-incremental)
-  - participanteId: INTEGER (FK -> Participante.id, único 1:1)
-  - horaIngreso: DATE (TIMESTAMP, por defecto NOW)
+  - participanteId: INTEGER (FK -> Participante.id, 1:1)
+  - horaIngreso: TIMESTAMP (por defecto NOW)
   - metodo: ENUM ('qr', 'manual')
-  - estado: ENUM ('presente', 'tardio', 'ausente', por defecto 'presente')
+  - estado: ENUM ('presente', 'tardio', 'ausente')
   - createdAt / updatedAt: TIMESTAMP
 
 
-5. SEGURIDAD Y CONTROL DE PETICIONES
+6. SEGURIDAD, AUTENTICACIÓN Y PROTECCIÓN IDOR/BOLA
 ----------------------------------------------------------------------
-* Autenticación con JWT (JSON Web Tokens):
-  - Token firmado con clave secreta (JWT_SECRET) y expiración de 8 horas.
-  - Payload contiene { id, rol }.
-  - Middleware verificarToken valida el encabezado 'Authorization: Bearer <token>'.
+* JWT (JSON Web Tokens):
+  - Tokens firmados con JWT_SECRET y expiración de 8 horas.
+  - Interceptor HTTP en Flutter añade automáticamente 'Authorization: Bearer <token>'.
+  - Si el token expira (HTTP 401), el cliente limpia la sesión y redirige al Login.
 
-* Middlewares de Autorización:
-  - soloAdmin: Exclusivo para rol 'Administrador'.
-  - soloOperador: Permite roles 'Operador' o 'Administrador'.
+* Mitigación de IDOR / BOLA en Check-in QR:
+  - El endpoint /api/asistencia/check-in-qr extrae el usuarioId directamente 
+    del token validado (req.usuario.id), imposibilitando la suplantación de identidad.
 
-* Mitigación de IDOR / BOLA (Broken Object Level Authorization):
-  - En check-in por QR (/api/asistencia/check-in-qr), el usuarioId se obtiene 
-    estrictamente del token JWT verificado (req.usuario.id), imposibilitando 
-    la suplantación de identidad mediante alteración del payload en la petición.
-
-* Rate Limiting (express-rate-limit):
-  - loginLimiter: Máximo 10 intentos de autenticación cada 15 minutos por IP.
-  - checkInLimiter: Máximo 30 solicitudes de check-in por minuto por IP.
-
-* Manejo Seguro de Errores:
-  - Mensajes de excepción de base de datos y detalles internos no se exponen 
-    al cliente en respuestas de error 500.
+* Rate Limiting:
+  - Login: Máximo 10 peticiones cada 15 minutos por IP.
+  - Check-in: Máximo 30 peticiones por minuto por IP.
 
 
-6. MATRIZ DE PERMISOS
-----------------------------------------------------------------------
-Acción                              | Admin | Operador | Miembro | Invitado
-------------------------------------+-------+----------+---------+---------
-Crear / Editar / Eliminar Eventos   |   SÍ  |    SÍ    |    NO   |    NO
-Convocar Participantes a Evento     |   SÍ  |    SÍ    |    NO   |    NO
-Consultar Todos los Eventos         |   SÍ  |    SÍ    |    SÍ*  |    NO
-Consultar "Mis Eventos" Convocados  |   SÍ  |    SÍ    |    SÍ   |    NO
-Registrar Check-in Propio por QR    |   SÍ  |    SÍ    |    SÍ   |    NO
-Registrar Check-in de Invitado      | Público (Reuniones abiertas)
-Registrar Asistencia Manual         |   SÍ  |    SÍ    |    NO   |    NO
-Crear / Editar / Eliminar Usuarios  |   SÍ  |    NO    |    NO   |    NO
-Ver Reporte de Asistencia           |   SÍ  |    NO    |    NO   |    NO
-
-* Nota: El endpoint general /api/eventos requiere autenticación; para Miembros 
-se dispone de /api/eventos/mis-eventos con filtrado seguro por usuario.
-
-
-7. CATÁLOGO DE ENDPOINTS DE LA API
+7. CATÁLOGO COMPLETO DE ENDPOINTS DE LA API
 ----------------------------------------------------------------------
 
 --- AUTENTICACIÓN (/api/auth) ---
 * POST /api/auth/login
-  - Rate Limit: loginLimiter (10 pet/15 min)
-  - Auth: Pública
-  - Body: { "correo": "admin@test.com", "password": "secretpassword" }
+  - Body: { "correo": "...", "password": "..." }
   - Retorna: { "token": "...", "usuario": { "id", "nombre", "correo", "rol" } }
 
---- EVENTOS (/api/eventos) ---
-* POST /api/eventos
-  - Auth: verificarToken, soloOperador (Admin / Operador)
+--- EVENTOS / REUNIONES (/api/eventos) ---
+* POST /api/eventos                     [Rol: Operador / Admin]
   - Body: { "nombre", "fecha", "hora", "lugar", "toleranciaMin", "tipoReunion" }
-  - Retorna: Evento creado con código QR en base64.
-* GET /api/eventos
-  - Auth: verificarToken
-  - Retorna: Listado completo de eventos ordenados por fecha.
-* GET /api/eventos/mis-eventos
-  - Auth: verificarToken (Cualquier usuario autenticado)
-  - Retorna: Listado de eventos a los que el usuario logueado está convocado.
-* PUT /api/eventos/:id
-  - Auth: verificarToken, soloOperador
-  - Body: Campos a actualizar (nombre, fecha, hora, lugar, toleranciaMin, tipoReunion)
-* DELETE /api/eventos/:id
-  - Auth: verificarToken, soloOperador
+  - Retorna: Evento creado con imagen QR en base64.
+* GET /api/eventos                      [Autenticado]
+  - Retorna: Listado general de eventos (o eventos convocados si es rol Miembro).
+* GET /api/eventos/mis-eventos          [Autenticado]
+  - Retorna: Convocatorias exclusivas del usuario conectado.
+* PUT /api/eventos/:id                  [Rol: Operador / Admin]
+  - Body: Campos a modificar (si no tiene asistencias).
+* DELETE /api/eventos/:id               [Rol: Operador / Admin]
   - Elimina el evento si no tiene asistencias registradas.
 
 --- PARTICIPANTES / CONVOCATORIAS (/api/eventos/:id/participantes) ---
-* POST /api/eventos/:id/participantes  (o /api/participantes/:id/participantes)
-  - Auth: verificarToken, soloOperador
+* POST /api/eventos/:id/participantes   [Rol: Operador / Admin]
   - Body: { "usuarioId": 2 }
-  - Asocia un usuario al evento.
-* GET /api/eventos/:id/participantes   (o /api/participantes/:id/participantes)
-  - Auth: verificarToken
-  - Retorna: Lista de participantes convocados con datos del usuario.
+  - Asocia y convoca a un usuario a la reunión.
+* GET /api/eventos/:id/participantes    [Autenticado]
+  - Retorna: Lista de convocados con datos del usuario y estado de asistencia.
 
 --- ASISTENCIA Y CHECK-IN (/api/asistencia) ---
-* POST /api/asistencia/check-in-qr
-  - Rate Limit: checkInLimiter (30 pet/min)
-  - Auth: verificarToken
+* POST /api/asistencia/check-in-qr      [Autenticado]
   - Body: { "eventoId": 1 }
-  - Registra asistencia del usuario autenticado (ID extraído del token).
-* POST /api/asistencia/check-in-invitado
-  - Rate Limit: checkInLimiter (30 pet/min)
-  - Auth: Pública
-  - Body: { "eventoId": 1, "nombre": "Carlos Perez", "cedula": "12345678" }
-  - Registra asistencia de invitado en reuniones abiertas.
-* POST /api/asistencia/eventos/:id/asistencia-manual
-  - Auth: verificarToken, soloOperador
-  - Body: { "usuarioId": 3 } O BIEN { "nombre": "Ana Gomez", "cedula": "87654321", "estadoPersonalizado": "presente" }
-  - Registra check-in manual con asignación de estado automática o personalizada.
-* GET /api/asistencia/eventos/:id/reporte
-  - Auth: verificarToken, soloAdmin
-  - Retorna: Métricas totales (presentes, tardíos, ausentes) y lista detallada.
+  - Check-in por escáner de código QR (identidad extraída del JWT).
+* POST /api/asistencia/check-in-invitado [Público]
+  - Body: { "eventoId": 1, "nombre": "...", "cedula": "..." }
+  - Registro de externos en eventos con tipoReunion 'abierta'.
+* POST /api/asistencia/eventos/:id/asistencia-manual [Rol: Operador / Admin]
+  - Body: { "usuarioId": 3 } O { "nombre": "...", "cedula": "...", "estadoPersonalizado": "presente" }
+* GET /api/asistencia/eventos/:id/reporte [Rol: Admin]
+  - Retorna: Métricas totales (presentes, tardíos, ausentes) y listado detallado.
 
 --- USUARIOS (/api/usuarios) ---
-* POST /api/usuarios
-  - Auth: verificarToken, soloAdmin
+* POST /api/usuarios                    [Rol: Admin]
   - Body: { "nombre", "cedula", "correo", "password", "rol" }
-* GET /api/usuarios
-  - Auth: verificarToken, soloAdmin
-  - Retorna: Listado completo de usuarios registrados.
-* PUT /api/usuarios/:id
-  - Auth: verificarToken, soloAdmin
-  - Body: Campos a actualizar (nombre, cedula, correo, password, rol)
-* DELETE /api/usuarios/:id
-  - Auth: verificarToken, soloAdmin
-  - Elimina usuario (bloqueado para autoeliminación).
+* GET /api/usuarios                     [Rol: Admin]
+  - Retorna: Listado general de usuarios registrados.
+* PUT /api/usuarios/:id                 [Rol: Admin]
+  - Body: Datos a actualizar del usuario.
+* DELETE /api/usuarios/:id              [Rol: Admin]
+  - Elimina usuario (bloqueado para autoeliminación de administradores).
 
 
-8. STACK TECNOLÓGICO
+8. STACK TECNOLÓGICO CONSOLIDADO
 ----------------------------------------------------------------------
-* Runtime: Node.js
-* Framework web: Express
-* ORM: Sequelize v6
-* Base de datos: PostgreSQL (alojado en la nube en Render)
-* Criptografía y Tokens: bcryptjs, jsonwebtoken
-* Generación de códigos QR: paquete qrcode
-* Seguridad y Rate Limiting: express-rate-limit, cors
-* Configuración de entorno: dotenv
-* Pruebas y consumo: Postman
-
-
-9. GUÍA DE EJECUCIÓN LOCAL
-----------------------------------------------------------------------
-1. Requisitos:
-   - Node.js (versión 16 o superior)
-   - Acceso a internet para conectar con la base de datos en Render.
-
-2. Configuración de Variables de Entorno (Backend/.env):
-   PORT=3000
-   DATABASE_URL=postgresql://<usuario>:<password>@<host>/<database>?ssl=true
-   JWT_SECRET=<clave_secreta_jwt>
-
-3. Instalación y Puesta en Marcha:
-   $ cd Backend
-   $ npm install
-   $ npm run dev
-
-   El servidor levantará en http://localhost:3000 con nodemon, conectará 
-   a PostgreSQL, sincronizará los modelos mediante sequelize.sync({ alter: true }) 
-   y quedará listo para recibir peticiones.
+* Backend: Node.js, Express, Sequelize v6, PostgreSQL (Render Cloud), bcryptjs, jsonwebtoken, qrcode, cors, express-rate-limit.
+* Frontend & mobileCitas: Flutter SDK 3.x, Dart 3.x, Dio 5.x, mobile_scanner, qr_flutter, shared_preferences.
+* Plataformas soportadas: Web (Chrome / Edge), Desktop (Windows), Móvil (Android / iOS).
 ======================================================================
