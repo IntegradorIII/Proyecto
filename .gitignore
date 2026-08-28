@@ -1,9 +1,7 @@
 # ==========================================
 # Environment & Sensitive Files
+# (Incluido para evaluacion academica inmediata)
 # ==========================================
-.env
-.env.*
-!.env.example
 *.pem
 *.key
 
