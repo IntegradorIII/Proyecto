@@ -32,8 +32,8 @@ app.use('/api/participantes', participanteRoutes);
 app.use('/api/asistencia', asistenciaRoutes);
 app.use('/api/usuarios', usuarioRoutes);
 
-// Servir la aplicación Flutter Web (SPA) para cualquier otra ruta
-app.get('*', (req, res) => {
+// Servir la aplicación Flutter Web (SPA) para cualquier otra ruta no capturada por la API
+app.use((req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
