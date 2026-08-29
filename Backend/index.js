@@ -11,6 +11,7 @@ const eventoRoutes = require('./routes/eventoRoutes');
 const participanteRoutes = require('./routes/participanteRoutes');
 const asistenciaRoutes = require('./routes/asistenciaRoutes');
 const usuarioRoutes = require('./routes/usuarioRoutes');
+const reunionWebRoutes = require('./routes/reunionWebRoutes');
 
 const app = express();
 app.use(cors());
@@ -20,6 +21,10 @@ app.get('/', (req, res) => {
   res.send('API de Asistencia corriendo correctamente');
 });
 
+
+app.use('/', reunionWebRoutes);
+
+// Rutas de API REST
 app.use('/api/auth', authRoutes);
 app.use('/api/eventos', eventoRoutes);
 app.use('/api/participantes', participanteRoutes);
@@ -40,4 +45,4 @@ if (require.main === module) {
   iniciar();
 }
 
-module.exports = { app, iniciar };
+module.exports = { app, iniciar };

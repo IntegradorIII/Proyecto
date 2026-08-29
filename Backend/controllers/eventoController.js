@@ -45,8 +45,11 @@ const crearEvento = async (req, res) => {
       tipoReunion: tipoReunion || 'solo_miembros',
     });
 
-    const contenidoQR = `${process.env.APP_URL || 'http://localhost:3000'}/reunion/${nuevoEvento.id}`;
-    const codigoQr = await QRCode.toDataURL(contenidoQR);
+    const baseUrl = process.env.APP_URL || 'http://localhost:3000';
+    const rutaRedireccion = nuevoEvento.tipoReunion === 'solo_miembros'
+      ? `${baseUrl}/reunion/${nuevoEvento.id}/login`
+      : `${baseUrl}/reunion/${nuevoEvento.id}/invitado`;
+    const codigoQr = await QRCode.toDataURL(rutaRedireccion);
     await nuevoEvento.update({ codigoQr });
 
     res.status(201).json({
@@ -107,6 +110,22 @@ const misEventos = async (req, res) => {
   }
 };
 
+const obtenerEventoPublico = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const evento = await Evento.findByPk(id, {
+      attributes: ['id', 'nombre', 'fecha', 'hora', 'lugar', 'toleranciaMin', 'tipoReunion'],
+    });
+    if (!evento) {
+      return res.status(404).json({ mensaje: 'Evento no encontrado' });
+    }
+    res.json({ evento });
+  } catch (error) {
+    console.error('Error en obtenerEventoPublico:', error);
+    res.status(500).json({ mensaje: 'Error interno del servidor al obtener información del evento' });
+  }
+};
+
 const editarEvento = async (req, res) => {
   try {
     const { id } = req.params;
@@ -139,13 +158,21 @@ const editarEvento = async (req, res) => {
       });
     }
 
+    const tipoFinal = tipoReunion || evento.tipoReunion;
+    const baseUrl = process.env.APP_URL || 'http://localhost:3000';
+    const rutaRedireccion = tipoFinal === 'solo_miembros'
+      ? `${baseUrl}/reunion/${evento.id}/login`
+      : `${baseUrl}/reunion/${evento.id}/invitado`;
+    const codigoQr = await QRCode.toDataURL(rutaRedireccion);
+
     await evento.update({
       nombre: nombre !== undefined ? nombre.trim() : evento.nombre,
       fecha: fechaFinal,
       hora: horaFinal,
       lugar: lugar !== undefined ? lugar.trim() : evento.lugar,
       toleranciaMin: toleranciaMin !== undefined ? parseInt(toleranciaMin, 10) : evento.toleranciaMin,
-      tipoReunion: tipoReunion || evento.tipoReunion,
+      tipoReunion: tipoFinal,
+      codigoQr,
     });
 
     res.json({ mensaje: 'Evento actualizado correctamente', evento });
@@ -174,7 +201,7 @@ const eliminarEvento = async (req, res) => {
       return res.status(400).json({ mensaje: 'No se puede eliminar un evento que ya tiene asistencias registradas' });
     }
 
-    // Eliminar participantes asociados si los hay
+    
     await Participante.destroy({ where: { eventoId: id } });
     await evento.destroy();
 
@@ -185,4 +212,11 @@ const eliminarEvento = async (req, res) => {
   }
 };
 
-module.exports = { crearEvento, listarEventos, misEventos, editarEvento, eliminarEvento };
+module.exports = {
+  crearEvento,
+  listarEventos,
+  misEventos,
+  obtenerEventoPublico,
+  editarEvento,
+  eliminarEvento,
+};
