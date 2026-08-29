@@ -5,11 +5,13 @@ const {
   crearEvento,
   listarEventos,
   misEventos,
+  obtenerEventoPublico,
   editarEvento,
   eliminarEvento,
 } = require('../controllers/eventoController');
 const { asociarParticipante, listarParticipantes } = require('../controllers/participanteController');
 
+router.get('/:id/publico', obtenerEventoPublico);
 router.post('/', verificarToken, soloOperador, crearEvento);
 router.get('/', verificarToken, listarEventos);
 router.get('/mis-eventos', verificarToken, misEventos);

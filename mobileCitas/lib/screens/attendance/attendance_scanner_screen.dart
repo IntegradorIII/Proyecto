@@ -46,7 +46,7 @@ class _AttendanceScannerScreenState extends State<AttendanceScannerScreen> {
       _isProcessing = true;
     });
 
-    // Detener la cámara temporalmente
+   
     _scannerController.stop();
 
     try {
@@ -61,7 +61,7 @@ class _AttendanceScannerScreenState extends State<AttendanceScannerScreen> {
       final attendance = await _attendanceService.registerAttendance(qrData);
 
       if (!mounted) return;
-      Navigator.of(context).pop(); // Cerrar el dialog de carga
+      Navigator.of(context).pop(); 
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -70,12 +70,11 @@ class _AttendanceScannerScreenState extends State<AttendanceScannerScreen> {
         ),
       );
 
-      // Regresar a la pantalla anterior
       Navigator.of(context).pop();
 
     } catch (e) {
       if (!mounted) return;
-      Navigator.of(context).pop(); // Cerrar el dialog de carga
+      Navigator.of(context).pop(); 
       
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -84,7 +83,7 @@ class _AttendanceScannerScreenState extends State<AttendanceScannerScreen> {
         ),
       );
 
-      // Reiniciar cámara
+      
       _scannerController.start();
       setState(() {
         _isProcessing = false;

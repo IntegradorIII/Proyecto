@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-
 import '../../screens/login/login_screen.dart';
 import '../../screens/home/home_screen.dart';
 import '../../screens/attendance/attendance_scanner_screen.dart';
@@ -13,38 +12,56 @@ class AppRoutes {
   static const attendanceScanner = "/attendance/scanner";
   static const users = "/users";
 
-  /// Generador de rutas que actúa como Route Guard / Middleware
   static Route<dynamic> generateRoute(RouteSettings settings) {
     final bool isAuthenticated = SessionManager.isAuthenticated;
 
-    // Si NO está autenticado y trata de ir a cualquier ruta protegida (distinta de login),
-    // lo redirigimos forzosamente al login.
-    if (!isAuthenticated && settings.name != login) {
-      return MaterialPageRoute(builder: (_) => const LoginScreen());
+    final bool isPublicRoute = settings.name == login;
+
+    if (!isAuthenticated && !isPublicRoute) {
+      return MaterialPageRoute(
+        builder: (_) => const LoginScreen(),
+        settings: settings,
+      );
     }
 
-    // Si SÍ está autenticado y trata de ir a la pantalla de login,
-    // lo redirigimos forzosamente a la pantalla principal.
-    if (isAuthenticated && settings.name == login) {
-      return MaterialPageRoute(builder: (_) => const HomeScreen());
+    if (isAuthenticated && settings.name == login && settings.arguments == null) {
+      return MaterialPageRoute(
+        builder: (_) => const HomeScreen(),
+        settings: settings,
+      );
     }
 
-    // Mapeo de rutas estándar
+   
     switch (settings.name) {
       case login:
-        return MaterialPageRoute(builder: (_) => const LoginScreen());
+        final meetingId = settings.arguments is int
+            ? settings.arguments as int
+            : (settings.arguments is String ? int.tryParse(settings.arguments as String) : null);
+        return MaterialPageRoute(
+          builder: (_) => LoginScreen(meetingId: meetingId),
+          settings: settings,
+        );
+
       case home:
-        return MaterialPageRoute(builder: (_) => const HomeScreen());
+        return MaterialPageRoute(
+          builder: (_) => const HomeScreen(),
+          settings: settings,
+        );
+
       case attendanceScanner:
-        return MaterialPageRoute(builder: (_) => const AttendanceScannerScreen());
+        return MaterialPageRoute(
+          builder: (_) => const AttendanceScannerScreen(),
+          settings: settings,
+        );
+
       default:
-        // Ruta por defecto o error (fallback)
         return MaterialPageRoute(
           builder: (_) => Scaffold(
             body: Center(
               child: Text("Ruta no encontrada: ${settings.name}"),
             ),
           ),
+          settings: settings,
         );
     }
   }

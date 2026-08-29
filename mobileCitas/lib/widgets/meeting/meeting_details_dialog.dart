@@ -7,6 +7,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/storage/session_manager.dart';
+import '../../core/network/api_constants.dart';
 import '../../models/meeting.dart';
 import '/core/services/participant_service.dart';
 
@@ -314,7 +315,7 @@ class _MeetingQrCode extends StatelessWidget {
 
   const _MeetingQrCode({required this.meeting});
 
-  /// El backend genera el QR real en crearEvento (QRCode.toDataURL) y lo
+  /// El backend genera el QR real en crearEvento (QRCode.toDataURL)
   Uint8List? _decodeQr() {
     final raw = meeting.codigoQr;
     if (raw == null || raw.isEmpty) return null;
@@ -330,6 +331,7 @@ class _MeetingQrCode extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bytes = _decodeQr();
+    final fallbackUrl = "${ApiConstants.baseUrl}/reunion/${meeting.id}/${meeting.tipoReunion == TipoReunion.abierta ? 'invitado' : 'login'}";
 
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
@@ -342,7 +344,7 @@ class _MeetingQrCode extends StatelessWidget {
       child: bytes != null
           ? Image.memory(bytes, width: 200, height: 200)
           : QrImageView(
-              data: "evento-${meeting.id}",
+              data: fallbackUrl,
               size: 200,
             ),
     );

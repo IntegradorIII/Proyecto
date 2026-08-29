@@ -1,7 +1,10 @@
+const { Op } = require('sequelize');
 const Asistencia = require('../models/Asistencia');
 const Participante = require('../models/Participante');
 const Evento = require('../models/Evento');
 const Usuario = require('../models/Usuario');
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const construirFechaHora = (fecha, hora) => {
   if (!fecha || !hora) return null;
@@ -19,7 +22,7 @@ const calcularEstadoAsistencia = (evento) => {
 
   const diffMinutos = (ahora - fechaHoraEvento) / (1000 * 60);
 
-  // Si intenta registrarse con más de 15 minutos de antelación al inicio
+ 
   if (diffMinutos < -15) {
     return {
       valido: false,
@@ -27,7 +30,7 @@ const calcularEstadoAsistencia = (evento) => {
     };
   }
 
-  // Si intenta registrarse después de 4 horas (240 minutos) de iniciada la reunión
+
   if (diffMinutos > 240) {
     return {
       valido: false,
@@ -42,7 +45,7 @@ const calcularEstadoAsistencia = (evento) => {
 const checkInQR = async (req, res) => {
   try {
     const { eventoId } = req.body;
-    const usuarioId = req.usuario.id; // Corrección IDOR/BOLA: extraído directamente del token JWT
+    const usuarioId = req.usuario.id;
 
     if (!eventoId) {
       return res.status(400).json({ mensaje: 'El eventoId es obligatorio' });
@@ -85,77 +88,22 @@ const checkInQR = async (req, res) => {
       estado: validacionTiempo.estado,
     });
 
-    res.json({ mensaje: `Asistencia registrada como ${validacionTiempo.estado}`, asistencia });
+    res.json({
+      mensaje: `Asistencia registrada como ${validacionTiempo.estado}`,
+      asistencia,
+      usuario: { id: usuario.id, nombre: usuario.nombre, correo: usuario.correo, rol: usuario.rol },
+      evento: { id: evento.id, nombre: evento.nombre, tipoReunion: evento.tipoReunion },
+    });
   } catch (error) {
     console.error('Error en checkInQR:', error);
     res.status(500).json({ mensaje: 'Error interno del servidor al registrar asistencia' });
   }
 };
 
-const checkInInvitado = async (req, res) => {
-  try {
-    const { eventoId, nombre, cedula } = req.body;
-
-    if (!eventoId || !nombre || !cedula) {
-      return res.status(400).json({ mensaje: 'eventoId, nombre y cedula son obligatorios' });
-    }
-
-    const evento = await Evento.findByPk(eventoId);
-    if (!evento) {
-      return res.status(404).json({ mensaje: 'Evento no encontrado' });
-    }
-
-    if (evento.tipoReunion === 'solo_miembros') {
-      return res.status(403).json({ mensaje: 'Esta reunión no permite invitados' });
-    }
-
-    const validacionTiempo = calcularEstadoAsistencia(evento);
-    if (!validacionTiempo.valido) {
-      return res.status(400).json({ mensaje: validacionTiempo.mensaje });
-    }
-
-    const cedulaLimpia = String(cedula).trim();
-    const nombreLimpio = String(nombre).trim();
-
-    let usuario = await Usuario.findOne({ where: { cedula: cedulaLimpia } });
-    if (!usuario) {
-      usuario = await Usuario.create({
-        nombre: nombreLimpio,
-        cedula: cedulaLimpia,
-        correo: `invitado_${cedulaLimpia}@temp.com`,
-        passwordHash: '-',
-        rol: 'Invitado',
-      });
-    }
-
-    let participante = await Participante.findOne({ where: { usuarioId: usuario.id, eventoId } });
-    if (!participante) {
-      participante = await Participante.create({ usuarioId: usuario.id, eventoId });
-    }
-
-    const yaRegistrado = await Asistencia.findOne({ where: { participanteId: participante.id } });
-    if (yaRegistrado) {
-      return res.status(409).json({ mensaje: 'Ya tiene asistencia registrada' });
-    }
-
-    const asistencia = await Asistencia.create({
-      participanteId: participante.id,
-      horaIngreso: validacionTiempo.ahora,
-      metodo: 'qr',
-      estado: validacionTiempo.estado,
-    });
-
-    res.json({ mensaje: `Invitado registrado como ${validacionTiempo.estado}`, asistencia });
-  } catch (error) {
-    console.error('Error en checkInInvitado:', error);
-    res.status(500).json({ mensaje: 'Error interno del servidor al registrar invitado' });
-  }
-};
-
 const checkInManual = async (req, res) => {
   try {
-    const { id } = req.params; // eventoId
-    const { usuarioId, nombre, cedula, estadoPersonalizado } = req.body;
+    const { id } = req.params;
+    const { usuarioId, nombre, cedula, correo, estadoPersonalizado } = req.body;
 
     const evento = await Evento.findByPk(id);
     if (!evento) {
@@ -175,13 +123,22 @@ const checkInManual = async (req, res) => {
       }
       const cedulaLimpia = String(cedula).trim();
       const nombreLimpio = String(nombre).trim();
+      const correoLimpio = correo ? String(correo).trim().toLowerCase() : `invitado_${cedulaLimpia}@temp.com`;
 
-      usuario = await Usuario.findOne({ where: { cedula: cedulaLimpia } });
+      usuario = await Usuario.findOne({
+        where: {
+          [Op.or]: [
+            { cedula: cedulaLimpia },
+            { correo: correoLimpio },
+          ],
+        },
+      });
+
       if (!usuario) {
         usuario = await Usuario.create({
           nombre: nombreLimpio,
           cedula: cedulaLimpia,
-          correo: `invitado_${cedulaLimpia}@temp.com`,
+          correo: correoLimpio,
           passwordHash: '-',
           rol: 'Invitado',
         });
@@ -267,4 +224,4 @@ const reporte = async (req, res) => {
   }
 };
 
-module.exports = { checkInQR, checkInInvitado, checkInManual, reporte };
+module.exports = { checkInQR, checkInManual, reporte };
