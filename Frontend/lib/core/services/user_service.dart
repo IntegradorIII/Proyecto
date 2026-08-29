@@ -70,16 +70,23 @@ class UserService {
     required String cedula,
     required String correo,
     required String rol,
+    String? password,
   }) async {
     try {
+      final Map<String, dynamic> data = {
+        "nombre": nombre,
+        "cedula": cedula,
+        "correo": correo,
+        "rol": rol,
+      };
+
+      if (password != null && password.trim().isNotEmpty) {
+        data["password"] = password.trim();
+      }
+
       final response = await _api.dio.put(
         "/api/usuarios/$id",
-        data: {
-          "nombre": nombre,
-          "cedula": cedula,
-          "correo": correo,
-          "rol": rol,
-        },
+        data: data,
       );
 
       return User.fromJson(response.data["usuario"]);

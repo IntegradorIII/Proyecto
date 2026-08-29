@@ -2,49 +2,30 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../models/user.dart';
 import '/core/services/user_service.dart';
 import '../../widgets/common/app_button.dart';
 import '../../widgets/common/app_textfield.dart';
 
-class EditUserDialog extends StatefulWidget {
-  final User user;
-
-  const EditUserDialog({super.key, required this.user});
+class CreateUserDialog extends StatefulWidget {
+  const CreateUserDialog({super.key});
 
   @override
-  State<EditUserDialog> createState() => _EditUserDialogState();
+  State<CreateUserDialog> createState() => _CreateUserDialogState();
 }
 
-class _EditUserDialogState extends State<EditUserDialog> {
+class _CreateUserDialogState extends State<CreateUserDialog> {
   final UserService _userService = UserService();
   final _formKey = GlobalKey<FormState>();
 
-  late TextEditingController _nombreController;
-  late TextEditingController _cedulaController;
-  late TextEditingController _correoController;
-  late TextEditingController _passwordController;
-  late String _rolSeleccionado;
+  final _nombreController = TextEditingController();
+  final _cedulaController = TextEditingController();
+  final _correoController = TextEditingController();
+  final _passwordController = TextEditingController();
+  String _rolSeleccionado = kRolesUsuario.first;
 
   bool _obscurePassword = true;
   bool _isSaving = false;
   String? _errorMessage;
-
-  @override
-  void initState() {
-    super.initState();
-    _nombreController = TextEditingController(text: widget.user.name);
-    _cedulaController = TextEditingController(text: widget.user.iden);
-    _correoController = TextEditingController(text: widget.user.email);
-    _passwordController = TextEditingController();
-    
-    // Ensure the role is within the list of valid roles
-    if (kRolesUsuario.contains(widget.user.role)) {
-      _rolSeleccionado = widget.user.role;
-    } else {
-      _rolSeleccionado = kRolesUsuario.first;
-    }
-  }
 
   @override
   void dispose() {
@@ -55,7 +36,7 @@ class _EditUserDialogState extends State<EditUserDialog> {
     super.dispose();
   }
 
-  Future<void> _editar() async {
+  Future<void> _registrar() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -71,19 +52,18 @@ class _EditUserDialogState extends State<EditUserDialog> {
     });
 
     try {
-      await _userService.editarUsuario(
-        id: widget.user.id,
+      await _userService.registrarUsuario(
         nombre: nombre,
         cedula: cedula,
         correo: correo,
+        password: password,
         rol: _rolSeleccionado,
-        password: password.isNotEmpty ? password : null,
       );
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Usuario actualizado exitosamente"),
+        const SnackBar(
+          content: Text("Usuario registrado exitosamente"),
           backgroundColor: Colors.green,
         ),
       );
@@ -112,25 +92,27 @@ class _EditUserDialogState extends State<EditUserDialog> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  "Editar usuario",
+                  "Registrar usuario",
                   style: AppTextStyles.pageTitle,
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 Text(
-                  "Modifica los datos del usuario o cambia su contraseña.",
+                  "Crea una cuenta nueva con acceso al sistema.",
                   style: AppTextStyles.body,
                 ),
                 const SizedBox(height: AppSpacing.xl),
                 AppTextField(
                   controller: _nombreController,
                   label: "Nombre completo",
-                  validator: (v) => v == null || v.trim().isEmpty ? "Obligatorio" : null,
+                  validator: (v) =>
+                      v == null || v.trim().isEmpty ? "Obligatorio" : null,
                 ),
                 const SizedBox(height: AppSpacing.lg),
                 AppTextField(
                   controller: _cedulaController,
                   label: "Cédula",
-                  validator: (v) => v == null || v.trim().isEmpty ? "Obligatorio" : null,
+                  validator: (v) =>
+                      v == null || v.trim().isEmpty ? "Obligatorio" : null,
                 ),
                 const SizedBox(height: AppSpacing.lg),
                 AppTextField(
@@ -148,12 +130,13 @@ class _EditUserDialogState extends State<EditUserDialog> {
                 const SizedBox(height: AppSpacing.lg),
                 AppTextField(
                   controller: _passwordController,
-                  label: "Nueva contraseña (opcional)",
+                  label: "Contraseña",
                   obscureText: _obscurePassword,
-                  helperText: "Dejar en blanco para conservar la contraseña actual",
                   suffixIcon: IconButton(
                     icon: Icon(
-                      _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                      _obscurePassword
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined,
                       color: Colors.grey,
                     ),
                     onPressed: () {
@@ -162,12 +145,8 @@ class _EditUserDialogState extends State<EditUserDialog> {
                       });
                     },
                   ),
-                  validator: (v) {
-                    if (v != null && v.trim().isNotEmpty && v.trim().length < 5) {
-                      return "La contraseña debe tener al menos 5 caracteres";
-                    }
-                    return null;
-                  },
+                  validator: (v) =>
+                      v == null || v.trim().length < 5 ? "Mínimo 5 caracteres" : null,
                 ),
                 const SizedBox(height: AppSpacing.lg),
                 DropdownButtonFormField<String>(
@@ -198,16 +177,17 @@ class _EditUserDialogState extends State<EditUserDialog> {
                   children: [
                     Flexible(
                       child: TextButton(
-                        onPressed: _isSaving ? null : () => Navigator.pop(context),
+                        onPressed:
+                            _isSaving ? null : () => Navigator.pop(context),
                         child: const Text("Cancelar"),
                       ),
                     ),
                     const SizedBox(width: 8),
                     Flexible(
                       child: AppButton(
-                        text: "Guardar",
+                        text: "Registrar",
                         isLoading: _isSaving,
-                        onPressed: _editar,
+                        onPressed: _registrar,
                       ),
                     ),
                   ],

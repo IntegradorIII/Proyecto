@@ -37,8 +37,7 @@ class _EditUserDialogState extends State<EditUserDialog> {
     _cedulaController = TextEditingController(text: widget.user.iden);
     _correoController = TextEditingController(text: widget.user.email);
     _passwordController = TextEditingController();
-    
-    // Ensure the role is within the list of valid roles
+
     if (kRolesUsuario.contains(widget.user.role)) {
       _rolSeleccionado = widget.user.role;
     } else {
@@ -82,7 +81,7 @@ class _EditUserDialogState extends State<EditUserDialog> {
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text("Usuario actualizado exitosamente"),
           backgroundColor: Colors.green,
         ),
@@ -124,13 +123,15 @@ class _EditUserDialogState extends State<EditUserDialog> {
                 AppTextField(
                   controller: _nombreController,
                   label: "Nombre completo",
-                  validator: (v) => v == null || v.trim().isEmpty ? "Obligatorio" : null,
+                  validator: (v) =>
+                      v == null || v.trim().isEmpty ? "Obligatorio" : null,
                 ),
                 const SizedBox(height: AppSpacing.lg),
                 AppTextField(
                   controller: _cedulaController,
                   label: "Cédula",
-                  validator: (v) => v == null || v.trim().isEmpty ? "Obligatorio" : null,
+                  validator: (v) =>
+                      v == null || v.trim().isEmpty ? "Obligatorio" : null,
                 ),
                 const SizedBox(height: AppSpacing.lg),
                 AppTextField(
@@ -153,7 +154,9 @@ class _EditUserDialogState extends State<EditUserDialog> {
                   helperText: "Dejar en blanco para conservar la contraseña actual",
                   suffixIcon: IconButton(
                     icon: Icon(
-                      _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                      _obscurePassword
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined,
                       color: Colors.grey,
                     ),
                     onPressed: () {
@@ -198,7 +201,8 @@ class _EditUserDialogState extends State<EditUserDialog> {
                   children: [
                     Flexible(
                       child: TextButton(
-                        onPressed: _isSaving ? null : () => Navigator.pop(context),
+                        onPressed:
+                            _isSaving ? null : () => Navigator.pop(context),
                         child: const Text("Cancelar"),
                       ),
                     ),

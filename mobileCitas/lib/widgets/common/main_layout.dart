@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/storage/session_manager.dart';
 
 class MainLayout extends StatelessWidget {
   final String title;
@@ -12,8 +13,21 @@ class MainLayout extends StatelessWidget {
     required this.child,
   });
 
+  String _iniciales(String? name) {
+    if (name == null || name.trim().isEmpty) return "?";
+    final partes = name.trim().split(RegExp(r'\s+'));
+    final primera = partes.first.isNotEmpty ? partes.first[0] : '';
+    final segunda =
+        partes.length > 1 && partes.last.isNotEmpty ? partes.last[0] : '';
+    return (primera + segunda).toUpperCase();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final usuario = SessionManager.currentUser;
+    final String nombre = usuario?['nombre']?.toString() ?? 'Invitado';
+    final String rol = usuario?['rol']?.toString() ?? '';
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final isMobile = constraints.maxWidth < 800;
@@ -30,15 +44,30 @@ class MainLayout extends StatelessWidget {
                 },
               ),
               const SizedBox(width: 8),
-              const CircleAvatar(
+              CircleAvatar(
                 radius: 16,
-                child: Icon(Icons.person),
+                child: Text(
+                  _iniciales(nombre),
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                ),
               ),
-              const SizedBox(width: 12),
-              const Padding(
-                padding: EdgeInsets.only(right: 24),
-                child: Center(
-                  child: Text("Invitado"),
+              const SizedBox(width: 10),
+              Padding(
+                padding: const EdgeInsets.only(right: 16),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      nombre,
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                    ),
+                    if (rol.isNotEmpty)
+                      Text(
+                        rol,
+                        style: const TextStyle(fontSize: 11, color: Colors.grey),
+                      ),
+                  ],
                 ),
               ),
             ],

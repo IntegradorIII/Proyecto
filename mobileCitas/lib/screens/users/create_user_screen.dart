@@ -24,6 +24,7 @@ class _CreateUserScreenState extends State<CreateUserScreen> {
   final _passwordController = TextEditingController();
   String _rolSeleccionado = kRolesUsuario.first;
 
+  bool _obscurePassword = true;
   bool _isSaving = false;
   String? _errorMessage;
 
@@ -136,9 +137,23 @@ class _CreateUserScreenState extends State<CreateUserScreen> {
                       AppTextField(
                         controller: _passwordController,
                         label: "Contraseña",
-                        obscureText: true,
-                        validator: (v) => v == null || v.length < 6 
-                            ? "Mínimo 6 caracteres" : null,
+                        obscureText: _obscurePassword,
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscurePassword
+                                ? Icons.visibility_outlined
+                                : Icons.visibility_off_outlined,
+                            color: Colors.grey,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              _obscurePassword = !_obscurePassword;
+                            });
+                          },
+                        ),
+                        validator: (v) => v == null || v.trim().length < 5
+                            ? "Mínimo 5 caracteres"
+                            : null,
                       ),
                       const SizedBox(height: AppSpacing.lg),
                       DropdownButtonFormField<String>(
